@@ -1,0 +1,14 @@
+# Dependencies
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+Thumbs.db
+.DS_Store
+
+# AI Agent (local config)
+.agent/
+.gemini/

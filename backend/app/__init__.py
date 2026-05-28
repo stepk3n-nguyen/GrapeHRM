@@ -57,8 +57,9 @@ def create_app(config_name: str = None) -> Flask:
     from app.auth.routes import auth_bp
     app.register_blueprint(auth_bp)
 
-    from app.employee.routes import employee_bp
+    from app.employee.routes import employee_bp, position_bp
     app.register_blueprint(employee_bp)
+    app.register_blueprint(position_bp)
 
     # ── Route kiểm tra sức khỏe (health check) ──────────────────────
     @app.route("/api/health")

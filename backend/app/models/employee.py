@@ -47,6 +47,13 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
     # Ảnh đại diện
     profile_pic_url = db.Column(db.Text, nullable=True)
 
+    # Vị trí công việc (Job Position)
+    position_id = db.Column(
+        db.Integer,
+        db.ForeignKey("job_positions.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
     # ── Quan hệ với User (1 Employee ↔ 1 User account) ──────────────
 
     user = db.relationship("User", backref="employee", uselist=False,
@@ -71,3 +78,19 @@ class EmployeeSequence(db.Model):
 
     def __repr__(self):
         return f"<EmployeeSequence tenant={self.tenant_id} val={self.current_value}>"
+
+
+class JobPosition(TenantMixin, TimestampMixin, db.Model):
+    """Bảng job_positions — danh sách chức vụ/vị trí công việc."""
+
+    __tablename__ = "job_positions"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+
+    # Quan hệ ngược lại (1 Position -> nhiều Employees)
+    employees = db.relationship("Employee", backref="position", lazy=True)
+
+    def __repr__(self):
+        return f"<JobPosition {self.name} tenant={self.tenant_id}>"

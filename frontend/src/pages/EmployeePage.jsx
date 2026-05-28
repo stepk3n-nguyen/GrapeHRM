@@ -67,6 +67,18 @@ const EmployeePage = () => {
     fetchEmployees();
   }, []);
 
+  // Vô hiệu hóa cuộn trang của body khi Modal đang mở
+  useEffect(() => {
+    if (isModalOpen) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
+    }
+    return () => {
+      document.body.style.overflow = '';
+    };
+  }, [isModalOpen]);
+
   // Xử lý khi bấm nút "Thêm mới" để mở modal
   const handleOpenAddModal = () => {
     setEditEmployee(null);

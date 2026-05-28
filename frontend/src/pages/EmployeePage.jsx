@@ -373,7 +373,7 @@ const EmployeePage = () => {
       </div>
 
       {/* Bảng dữ liệu nhân viên */}
-      <div className="card">
+      <div className="card card--no-hover">
         <div className="card__body" style={{ padding: 0 }}>
           {loading ? (
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px', gap: '12px' }}>

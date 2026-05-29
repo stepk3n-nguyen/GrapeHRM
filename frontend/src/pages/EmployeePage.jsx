@@ -11,17 +11,23 @@ const EmployeePage = () => {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Trạng thái biểu mẫu Modal
+  // Trạng thái biểu mẫu Modal Nhân viên
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null); // null = Thêm mới, object = Đang sửa
   
-  // Trạng thái quản lý Vị trí công việc (Job Positions)
-  const [positions, setPositions] = useState([]);
-  const [isPositionModalOpen, setIsPositionModalOpen] = useState(false);
-  const [editingPosition, setEditingPosition] = useState(null); // null = Thêm mới, object = Đang sửa
-  const [posFormData, setPosFormData] = useState({ name: '', description: '' });
+  // Trạng thái quản lý Chức vụ (Job Titles)
+  const [titles, setTitles] = useState([]);
+  const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
+  const [editingTitle, setEditingTitle] = useState(null);
+  const [titleFormData, setTitleFormData] = useState({ name: '', description: '' });
 
-  // Các trường biểu mẫu form
+  // Trạng thái quản lý Phòng ban (Departments)
+  const [departments, setDepartments] = useState([]);
+  const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
+  const [editingDept, setEditingDept] = useState(null);
+  const [deptFormData, setDeptFormData] = useState({ name: '', description: '' });
+
+  // Các trường biểu mẫu form nhân viên
   const [formData, setFormData] = useState({
     employee_id: '',
     first_name: '',
@@ -33,8 +39,11 @@ const EmployeePage = () => {
     mobile: '',
     work_email: '',
     joined_date: '',
-    state: 'ACTIVE',
-    position_id: '',
+    end_date: '',
+    address: '',
+    title_id: '',
+    department_id: '',
+    profile_pic_url: ''
   });
 
   // Trạng thái Toast thông báo
@@ -48,23 +57,36 @@ const EmployeePage = () => {
     }, 3000);
   };
 
-  // Fetch danh sách vị trí công việc từ API
-  const fetchPositions = async () => {
+  const fetchTitles = async () => {
     try {
-      const response = await fetch('/api/positions', {
+      const response = await fetch('/api/job-titles', {
         method: 'GET',
         headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
-        setPositions(data);
+        setTitles(data);
       }
     } catch (err) {
-      console.error('Fetch positions error:', err);
+      console.error('Fetch titles error:', err);
     }
   };
 
-  // Fetch danh sách nhân viên từ API
+  const fetchDepartments = async () => {
+    try {
+      const response = await fetch('/api/departments', {
+        method: 'GET',
+        headers: getAuthHeaders(),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setDepartments(data);
+      }
+    } catch (err) {
+      console.error('Fetch departments error:', err);
+    }
+  };
+
   const fetchEmployees = async () => {
     setLoading(true);
     try {
@@ -88,36 +110,31 @@ const EmployeePage = () => {
 
   useEffect(() => {
     fetchEmployees();
-    fetchPositions();
+    fetchTitles();
+    fetchDepartments();
   }, []);
 
-  // Vô hiệu hóa cuộn trang của body khi Modal đang mở
+  // Vô hiệu hóa cuộn trang của body khi bất kỳ Modal nào đang mở
   useEffect(() => {
-    if (isModalOpen) {
+    if (isModalOpen || isTitleModalOpen || isDeptModalOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
-  }, [isModalOpen]);
+    return () => { document.body.style.overflow = ''; };
+  }, [isModalOpen, isTitleModalOpen, isDeptModalOpen]);
 
-  // Xử lý khi bấm nút "Thêm mới" để mở modal
+  // Modal Nhân sự
   const handleOpenAddModal = async () => {
     setEditEmployee(null);
     let nextId = '';
     try {
-      const response = await fetch('/api/employees/next-id', {
-        headers: getAuthHeaders(),
-      });
+      const response = await fetch('/api/employees/next-id', { headers: getAuthHeaders() });
       if (response.ok) {
         const data = await response.json();
         nextId = data.next_id;
       }
-    } catch (err) {
-      console.error('Fetch next-id error:', err);
-    }
+    } catch (err) { console.error(err); }
 
     setFormData({
       employee_id: nextId,
@@ -129,14 +146,16 @@ const EmployeePage = () => {
       birthday: '',
       mobile: '',
       work_email: '',
-      joined_date: new Date().toISOString().split('T')[0], // Mặc định ngày hôm nay
-      state: 'ACTIVE',
-      position_id: '',
+      joined_date: new Date().toISOString().split('T')[0],
+      end_date: '',
+      address: '',
+      title_id: '',
+      department_id: '',
+      profile_pic_url: ''
     });
     setIsModalOpen(true);
   };
 
-  // Xử lý khi bấm nút "Sửa" nhân sự
   const handleOpenEditModal = (emp) => {
     setEditEmployee(emp);
     setFormData({
@@ -150,16 +169,17 @@ const EmployeePage = () => {
       mobile: emp.mobile || '',
       work_email: emp.work_email || '',
       joined_date: emp.joined_date || '',
-      state: emp.state || 'ACTIVE',
-      position_id: emp.position_id !== null ? String(emp.position_id) : '',
+      end_date: emp.end_date || '',
+      address: emp.address || '',
+      title_id: emp.title_id !== null ? String(emp.title_id) : '',
+      department_id: emp.department_id !== null ? String(emp.department_id) : '',
+      profile_pic_url: emp.profile_pic_url || ''
     });
     setIsModalOpen(true);
   };
 
-  // Lưu thông tin form (Thêm mới hoặc Cập nhật)
   const handleSaveEmployee = async (e) => {
     e.preventDefault();
-    
     if (!formData.first_name.trim() || !formData.last_name.trim()) {
       showToast('Họ và Tên nhân viên là bắt buộc.', 'error');
       return;
@@ -168,7 +188,8 @@ const EmployeePage = () => {
     const payload = {
       ...formData,
       gender: parseInt(formData.gender),
-      position_id: formData.position_id ? parseInt(formData.position_id) : null,
+      title_id: formData.title_id ? parseInt(formData.title_id) : null,
+      department_id: formData.department_id ? parseInt(formData.department_id) : null,
     };
 
     const isEdit = !!editEmployee;
@@ -181,9 +202,8 @@ const EmployeePage = () => {
         headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
-
-      let resData = {};
       const contentType = response.headers.get("content-type");
+      let resData = {};
       if (contentType && contentType.includes("application/json")) {
         resData = await response.json();
       }
@@ -191,19 +211,18 @@ const EmployeePage = () => {
       if (response.ok) {
         showToast(isEdit ? 'Cập nhật nhân viên thành công!' : 'Thêm nhân viên mới thành công!', 'success');
         setIsModalOpen(false);
-        fetchEmployees(); // Tải lại danh sách
+        fetchEmployees();
       } else {
-        showToast(resData.error || `Lỗi hệ thống (${response.status}): Không thể lưu thông tin.`, 'error');
+        showToast(resData.error || `Lỗi hệ thống (${response.status})`, 'error');
       }
     } catch (err) {
-      console.error('Save employee error:', err);
-      showToast('Lỗi xử lý dữ liệu hoặc không thể kết nối đến máy chủ.', 'error');
+      console.error(err);
+      showToast('Lỗi xử lý dữ liệu.', 'error');
     }
   };
 
-  // Xóa nhân sự khỏi hệ thống
   const handleDeleteEmployee = async (emp) => {
-    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${emp.full_name}" khỏi hệ thống không? Hành động này không thể hoàn tác.`);
+    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${emp.full_name}" khỏi hệ thống không?`);
     if (!isConfirmed) return;
 
     try {
@@ -211,105 +230,113 @@ const EmployeePage = () => {
         method: 'DELETE',
         headers: getAuthHeaders(),
       });
-
       if (response.ok) {
         showToast('Xóa nhân viên thành công!', 'success');
         fetchEmployees();
       } else {
-        let resData = {};
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          resData = await response.json();
-        }
-        showToast(resData.error || `Lỗi hệ thống (${response.status}): Không thể xóa nhân viên.`, 'error');
+        showToast('Không thể xóa nhân viên.', 'error');
       }
     } catch (err) {
-      console.error('Delete employee error:', err);
+      console.error(err);
       showToast('Có lỗi mạng xảy ra khi xóa.', 'error');
     }
   };
 
-  // Mở modal quản lý Vị trí
-  const handleOpenPositionModal = () => {
-    setEditingPosition(null);
-    setPosFormData({ name: '', description: '' });
-    setIsPositionModalOpen(true);
-  };
-
-  // Lưu Vị trí công việc (Thêm hoặc Cập nhật)
-  const handleSavePosition = async (e) => {
+  // Modal Chức vụ (Title)
+  const handleSaveTitle = async (e) => {
     e.preventDefault();
-    if (!posFormData.name.trim()) {
-      showToast('Tên vị trí công việc không được để trống.', 'error');
+    if (!titleFormData.name.trim()) {
+      showToast('Tên chức vụ không được để trống.', 'error');
       return;
     }
 
-    const isEdit = !!editingPosition;
-    const url = isEdit ? `/api/positions/${editingPosition.id}` : '/api/positions';
+    const isEdit = !!editingTitle;
+    const url = isEdit ? `/api/job-titles/${editingTitle.id}` : '/api/job-titles';
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
       const response = await fetch(url, {
         method,
         headers: getAuthHeaders(),
-        body: JSON.stringify(posFormData),
+        body: JSON.stringify(titleFormData),
       });
-
-      let resData = {};
-      const contentType = response.headers.get("content-type");
-      if (contentType && contentType.includes("application/json")) {
-        resData = await response.json();
-      }
-
       if (response.ok) {
-        showToast(isEdit ? 'Cập nhật vị trí thành công!' : 'Thêm vị trí mới thành công!', 'success');
-        setPosFormData({ name: '', description: '' });
-        setEditingPosition(null);
-        fetchPositions();
+        showToast(isEdit ? 'Cập nhật chức vụ thành công!' : 'Thêm chức vụ thành công!', 'success');
+        setTitleFormData({ name: '', description: '' });
+        setEditingTitle(null);
+        fetchTitles();
         fetchEmployees();
       } else {
-        showToast(resData.error || 'Không thể lưu vị trí công việc.', 'error');
+        const d = await response.json();
+        showToast(d.error || 'Lỗi lưu chức vụ', 'error');
       }
-    } catch (err) {
-      console.error('Save position error:', err);
-      showToast('Lỗi kết nối máy chủ.', 'error');
-    }
+    } catch (err) { showToast('Lỗi mạng', 'error'); }
   };
 
-  // Xóa vị trí công việc
-  const handleDeletePosition = async (pos) => {
-    const isConfirmed = window.confirm(`Bạn có chắc muốn xóa vị trí "${pos.name}"? Nhân viên thuộc vị trí này sẽ bị gán về trạng thái trống.`);
-    if (!isConfirmed) return;
+  const handleDeleteTitle = async (pos) => {
+    if (!window.confirm(`Xóa chức vụ "${pos.name}"?`)) return;
+    try {
+      const response = await fetch(`/api/job-titles/${pos.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      if (response.ok) {
+        showToast('Xóa chức vụ thành công', 'success');
+        fetchTitles();
+        fetchEmployees();
+      } else {
+        const d = await response.json();
+        showToast(d.error || 'Không thể xóa', 'error');
+      }
+    } catch (err) { showToast('Lỗi mạng', 'error'); }
+  };
+
+  // Modal Phòng ban (Department)
+  const handleSaveDepartment = async (e) => {
+    e.preventDefault();
+    if (!deptFormData.name.trim()) {
+      showToast('Tên phòng ban không được để trống.', 'error');
+      return;
+    }
+
+    const isEdit = !!editingDept;
+    const url = isEdit ? `/api/departments/${editingDept.id}` : '/api/departments';
+    const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(`/api/positions/${pos.id}`, {
-        method: 'DELETE',
+      const response = await fetch(url, {
+        method,
         headers: getAuthHeaders(),
+        body: JSON.stringify(deptFormData),
       });
-
       if (response.ok) {
-        showToast('Xóa vị trí thành công!', 'success');
-        fetchPositions();
+        showToast(isEdit ? 'Cập nhật phòng ban thành công!' : 'Thêm phòng ban thành công!', 'success');
+        setDeptFormData({ name: '', description: '' });
+        setEditingDept(null);
+        fetchDepartments();
         fetchEmployees();
       } else {
-        let resData = {};
-        const contentType = response.headers.get("content-type");
-        if (contentType && contentType.includes("application/json")) {
-          resData = await response.json();
-        }
-        showToast(resData.error || 'Không thể xóa vị trí.', 'error');
+        const d = await response.json();
+        showToast(d.error || 'Lỗi lưu phòng ban', 'error');
       }
-    } catch (err) {
-      console.error('Delete position error:', err);
-      showToast('Lỗi mạng khi xóa vị trí.', 'error');
-    }
+    } catch (err) { showToast('Lỗi mạng', 'error'); }
   };
 
-  // Lọc danh sách nhân viên theo từ khóa tìm kiếm (Họ tên, mã NV, email)
+  const handleDeleteDepartment = async (dept) => {
+    if (!window.confirm(`Xóa phòng ban "${dept.name}"?`)) return;
+    try {
+      const response = await fetch(`/api/departments/${dept.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      if (response.ok) {
+        showToast('Xóa phòng ban thành công', 'success');
+        fetchDepartments();
+        fetchEmployees();
+      } else {
+        const d = await response.json();
+        showToast(d.error || 'Không thể xóa', 'error');
+      }
+    } catch (err) { showToast('Lỗi mạng', 'error'); }
+  };
+
   const filteredEmployees = employees.filter((emp) => {
     const query = searchQuery.toLowerCase().trim();
     if (!query) return true;
-    
     return (
       emp.full_name?.toLowerCase().includes(query) ||
       emp.employee_id?.toLowerCase().includes(query) ||
@@ -319,7 +346,6 @@ const EmployeePage = () => {
 
   return (
     <div className="fade-in">
-      {/* Toast notifications container */}
       <div className="toast-container">
         {toasts.map((t) => (
           <div key={t.id} className={`toast toast--${t.type}`}>
@@ -335,7 +361,6 @@ const EmployeePage = () => {
         <span className="breadcrumb__item">Quản lý nhân viên</span>
       </div>
 
-      {/* Header khu vực quản lý */}
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: '16px', marginBottom: '24px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Hồ sơ nhân sự</h2>
@@ -345,8 +370,11 @@ const EmployeePage = () => {
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
-          <button className="btn btn--secondary" onClick={handleOpenPositionModal}>
-            <span>Quản lý Vị trí</span>
+          <button className="btn btn--secondary" onClick={() => setIsTitleModalOpen(true)}>
+            <span>Quản lý Chức vụ</span>
+          </button>
+          <button className="btn btn--secondary" onClick={() => setIsDeptModalOpen(true)}>
+            <span>Quản lý Phòng ban</span>
           </button>
           <button className="btn btn--primary" onClick={handleOpenAddModal}>
             <Plus size={16} />
@@ -355,7 +383,6 @@ const EmployeePage = () => {
         </div>
       </div>
 
-      {/* Bộ lọc và Tìm kiếm */}
       <div className="card" style={{ marginBottom: '20px' }}>
         <div className="card__body" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '400px', position: 'relative' }}>
@@ -372,7 +399,6 @@ const EmployeePage = () => {
         </div>
       </div>
 
-      {/* Bảng dữ liệu nhân viên */}
       <div className="card card--no-hover">
         <div className="card__body" style={{ padding: 0 }}>
           {loading ? (
@@ -395,9 +421,9 @@ const EmployeePage = () => {
                     <th>Ảnh</th>
                     <th>Mã NV</th>
                     <th>Họ và Tên</th>
-                    <th>Vị trí</th>
+                    <th>Chức vụ</th>
+                    <th>Phòng ban</th>
                     <th>Email Công việc</th>
-                    <th>Ngày vào làm</th>
                     <th>Trạng thái</th>
                     <th style={{ textAlign: 'right' }}>Thao tác</th>
                   </tr>
@@ -436,15 +462,12 @@ const EmployeePage = () => {
                         {emp.full_name}
                       </td>
                       <td style={{ fontWeight: 500 }}>
-                        {emp.position_name || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Không có</span>}
+                        {emp.title_name || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Không có</span>}
+                      </td>
+                      <td style={{ fontWeight: 500 }}>
+                        {emp.department_name || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Không có</span>}
                       </td>
                       <td>{emp.work_email || '---'}</td>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Calendar size={14} style={{ color: 'var(--color-text-muted)' }} />
-                          <span>{emp.joined_date ? new Date(emp.joined_date).toLocaleDateString('vi-VN') : '---'}</span>
-                        </div>
-                      </td>
                       <td>
                         <span className={`badge ${emp.state === 'ACTIVE' ? 'badge--success' : 'badge--danger'}`}>
                           {emp.state === 'ACTIVE' ? 'Đang làm' : 'Đã nghỉ'}
@@ -480,87 +503,76 @@ const EmployeePage = () => {
       {/* Modal biểu mẫu Thêm/Sửa nhân viên */}
       {isModalOpen && (
         <div className="modal-overlay">
-          <div className="modal">
+          <div className="modal" style={{ maxWidth: '800px' }}>
             <div className="modal__header">
               <h3 className="modal__title">
                 {editEmployee ? `Sửa thông tin: ${editEmployee.full_name}` : 'Thêm hồ sơ nhân viên mới'}
               </h3>
-              <button className="modal__close" onClick={() => setIsModalOpen(false)}>&times;</button>
+              <button className="modal__close" type="button" onClick={() => setIsModalOpen(false)}>&times;</button>
             </div>
             
             <form onSubmit={handleSaveEmployee}>
-              <div className="modal__body">
+              <div className="modal__body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
                 
-                {/* 1. Mã nhân sự & Vị trí công việc */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label form-label--required" htmlFor="employee_id">Mã nhân sự (ID)</label>
+                {/* Custom CSS for 3-columns grid */}
+                <style>{`
+                  .form-grid-3 {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 16px;
+                    margin-bottom: 16px;
+                  }
+                  @media (max-width: 768px) {
+                    .form-grid-3 {
+                      grid-template-columns: 1fr;
+                    }
+                  }
+                `}</style>
+
+                {/* Hàng 1 */}
+                <div className="form-grid-3">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label form-label--required" htmlFor="employee_id">Mã nhân sự</label>
                     <input 
                       type="text" 
                       id="employee_id" 
                       className="input" 
                       value={formData.employee_id}
-                      onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
                       disabled
                       style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
                     />
-                    <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                      Mã nhân sự được hệ thống tự động thiết lập và không được phép chỉnh sửa.
-                    </p>
                   </div>
-                  <div className="form-group">
-                    <label className="form-label form-label--required" htmlFor="position_id">Vị trí công việc</label>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label form-label--required" htmlFor="title_id">Chức vụ</label>
                     <select 
-                      id="position_id" 
+                      id="title_id" 
                       className="input" 
-                      value={formData.position_id}
-                      onChange={(e) => setFormData({ ...formData, position_id: e.target.value })}
-                      style={{ height: '40px' }}
+                      value={formData.title_id}
+                      onChange={(e) => setFormData({ ...formData, title_id: e.target.value })}
                       required
                     >
-                      <option value="">-- Chọn vị trí công việc --</option>
-                      {positions.map((pos) => (
-                        <option key={pos.id} value={pos.id}>{pos.name}</option>
-                      ))}
+                      <option value="">-- Chọn chức vụ --</option>
+                      {titles.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label form-label--required" htmlFor="department_id">Phòng ban</label>
+                    <select 
+                      id="department_id" 
+                      className="input" 
+                      value={formData.department_id}
+                      onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Chọn phòng ban --</option>
+                      {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
                 </div>
 
-                {/* 2. Trạng thái công việc & Tình trạng hôn nhân */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label form-label--required" htmlFor="state">Trạng thái công việc</label>
-                    <select 
-                      id="state" 
-                      className="input" 
-                      value={formData.state}
-                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                      style={{ height: '40px' }}
-                      required
-                    >
-                      <option value="ACTIVE">Đang làm việc (ACTIVE)</option>
-                      <option value="TERMINATED">Đã chấm dứt (TERMINATED)</option>
-                    </select>
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label" htmlFor="marital_status">Hôn nhân</label>
-                    <select 
-                      id="marital_status" 
-                      className="input" 
-                      value={formData.marital_status}
-                      onChange={(e) => setFormData({ ...formData, marital_status: e.target.value })}
-                      style={{ height: '40px' }}
-                    >
-                      <option value="Single">Độc thân</option>
-                      <option value="Married">Đã kết hôn</option>
-                      <option value="Divorced">Đã ly hôn</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* 3. Họ và tên */}
-                <div className="form-row">
-                  <div className="form-group">
+                {/* Hàng 2 */}
+                <div className="form-grid-3">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="first_name">Họ & Tên đệm</label>
                     <input 
                       type="text" 
@@ -572,7 +584,7 @@ const EmployeePage = () => {
                       required
                     />
                   </div>
-                  <div className="form-group">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="last_name">Tên chính</label>
                     <input 
                       type="text" 
@@ -584,18 +596,13 @@ const EmployeePage = () => {
                       required
                     />
                   </div>
-                </div>
-
-                {/* 4. Giới tính & Ngày sinh */}
-                <div className="form-row">
-                  <div className="form-group">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="gender">Giới tính</label>
                     <select 
                       id="gender" 
                       className="input" 
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                      style={{ height: '40px' }}
                       required
                     >
                       <option value="1">Nam</option>
@@ -603,7 +610,11 @@ const EmployeePage = () => {
                       <option value="3">Khác</option>
                     </select>
                   </div>
-                  <div className="form-group">
+                </div>
+
+                {/* Hàng 3 */}
+                <div className="form-grid-3">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="birthday">Ngày sinh</label>
                     <input 
                       type="date" 
@@ -614,12 +625,47 @@ const EmployeePage = () => {
                       required
                     />
                   </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="marital_status">Hôn nhân</label>
+                    <select 
+                      id="marital_status" 
+                      className="input" 
+                      value={formData.marital_status}
+                      onChange={(e) => setFormData({ ...formData, marital_status: e.target.value })}
+                    >
+                      <option value="Single">Độc thân</option>
+                      <option value="Married">Đã kết hôn</option>
+                      <option value="Divorced">Đã ly hôn</option>
+                    </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label form-label--required" htmlFor="mobile">Số điện thoại</label>
+                    <input 
+                      type="tel" 
+                      id="mobile" 
+                      className="input" 
+                      value={formData.mobile}
+                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
+                      required
+                    />
+                  </div>
                 </div>
 
-                {/* 5. Ngày vào làm & Số điện thoại */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label form-label--required" htmlFor="joined_date">Ngày vào làm</label>
+                {/* Hàng 4 */}
+                <div className="form-grid-3">
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label form-label--required" htmlFor="work_email">Email công việc</label>
+                    <input 
+                      type="email" 
+                      id="work_email" 
+                      className="input" 
+                      value={formData.work_email}
+                      onChange={(e) => setFormData({ ...formData, work_email: e.target.value })}
+                      required
+                    />
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label form-label--required" htmlFor="joined_date">Ngày bắt đầu</label>
                     <input 
                       type="date" 
                       id="joined_date" 
@@ -629,63 +675,48 @@ const EmployeePage = () => {
                       required
                     />
                   </div>
-                  <div className="form-group">
-                    <label className="form-label form-label--required" htmlFor="mobile">Số điện thoại</label>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="end_date">Ngày kết thúc</label>
                     <input 
-                      type="tel" 
-                      id="mobile" 
+                      type="date" 
+                      id="end_date" 
                       className="input" 
-                      placeholder="Ví dụ: 0987654321" 
-                      value={formData.mobile}
-                      onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
-                      required
+                      value={formData.end_date}
+                      onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     />
                   </div>
                 </div>
 
-                {/* 6. Email công việc & Ảnh đại diện */}
-                <div className="form-row">
-                  <div className="form-group">
-                    <label className="form-label form-label--required" htmlFor="work_email">Email công việc</label>
+                {/* Hàng 5 */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="address">Địa chỉ</label>
                     <input 
-                      type="email" 
-                      id="work_email" 
+                      type="text" 
+                      id="address" 
                       className="input" 
-                      placeholder="Ví dụ: nv.an@company.com" 
-                      value={formData.work_email}
-                      onChange={(e) => setFormData({ ...formData, work_email: e.target.value })}
-                      required
+                      value={formData.address}
+                      onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+                      placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
                     />
                   </div>
-                  
+                </div>
+
+                {/* Hàng 6 */}
+                <div style={{ marginBottom: '16px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" htmlFor="profile_pic_file">Ảnh đại diện nhân viên</label>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                      {/* Vùng xem trước ảnh đại diện */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
                       <div style={{ 
-                        width: '42px', 
-                        height: '42px', 
-                        borderRadius: '50%', 
-                        backgroundColor: 'var(--color-primary-light)', 
-                        color: 'var(--color-primary)',
-                        fontWeight: '700',
-                        fontSize: '14px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        overflow: 'hidden',
-                        border: '2px solid var(--color-border-light)',
-                        flexShrink: 0
+                        width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid var(--color-border-light)', flexShrink: 0
                       }}>
                         {formData.profile_pic_url ? (
-                          <img src={formData.profile_pic_url} alt="Xem trước" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          <img src={formData.profile_pic_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                         ) : (
                           formData.first_name && formData.last_name ? `${formData.first_name[0]}${formData.last_name[0]}` : '?'
                         )}
                       </div>
-
-                      {/* Ô tải file lên */}
-                      <div style={{ flex: 1, minWidth: '150px' }}>
+                      <div style={{ flex: 1 }}>
                         <input 
                           type="file" 
                           id="profile_pic_file" 
@@ -700,20 +731,12 @@ const EmployeePage = () => {
                                 return;
                               }
                               const reader = new FileReader();
-                              reader.onloadend = () => {
-                                setFormData({ ...formData, profile_pic_url: reader.result });
-                              };
+                              reader.onloadend = () => setFormData({ ...formData, profile_pic_url: reader.result });
                               reader.readAsDataURL(file);
                             }
                           }}
-                          style={{ padding: '8px 12px' }}
                         />
-                        <p style={{ fontSize: '11px', color: 'var(--color-text-muted)', marginTop: '4px' }}>
-                          Chấp nhận PNG, JPG (Tối đa 2MB).
-                        </p>
                       </div>
-
-                      {/* Nút xóa ảnh hiện tại */}
                       {formData.profile_pic_url && (
                         <button 
                           type="button" 
@@ -723,7 +746,7 @@ const EmployeePage = () => {
                             const fileInput = document.getElementById('profile_pic_file');
                             if (fileInput) fileInput.value = '';
                           }}
-                          style={{ padding: '6px 12px', fontSize: '12px', borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
+                          style={{ borderColor: 'var(--color-error)', color: 'var(--color-error)' }}
                         >
                           Xóa ảnh
                         </button>
@@ -746,132 +769,112 @@ const EmployeePage = () => {
         </div>
       )}
 
-      {/* Modal Quản lý Vị trí công việc */}
-      {isPositionModalOpen && (
+      {/* Modal Quản lý Chức vụ */}
+      {isTitleModalOpen && (
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: '600px' }}>
             <div className="modal__header">
-              <h3 className="modal__title">Quản lý Vị trí công việc</h3>
-              <button className="modal__close" onClick={() => setIsPositionModalOpen(false)}>&times;</button>
+              <h3 className="modal__title">Quản lý Chức vụ</h3>
+              <button className="modal__close" onClick={() => setIsTitleModalOpen(false)}>&times;</button>
             </div>
             <div className="modal__body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-              
-              {/* Form thêm/sửa vị trí */}
-              <form onSubmit={handleSavePosition} style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6' }}>
+              <form onSubmit={handleSaveTitle} style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6' }}>
                 <h4 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px', color: 'var(--color-primary-dark)' }}>
-                  {editingPosition ? `Chỉnh sửa vị trí: ${editingPosition.name}` : 'Thêm vị trí công việc mới'}
+                  {editingTitle ? `Chỉnh sửa chức vụ: ${editingTitle.name}` : 'Thêm chức vụ mới'}
                 </h4>
                 <div className="form-group" style={{ marginBottom: '12px' }}>
-                  <label className="form-label form-label--required" htmlFor="pos_name">Tên vị trí</label>
-                  <input
-                    type="text"
-                    id="pos_name"
-                    className="input"
-                    placeholder="Ví dụ: IT, Bảo vệ, Lễ tân,..."
-                    value={posFormData.name}
-                    onChange={(e) => setPosFormData({ ...posFormData, name: e.target.value })}
-                    required
-                  />
+                  <label className="form-label form-label--required">Tên chức vụ</label>
+                  <input type="text" className="input" value={titleFormData.name} onChange={(e) => setTitleFormData({ ...titleFormData, name: e.target.value })} required />
                 </div>
                 <div className="form-group" style={{ marginBottom: '16px' }}>
-                  <label className="form-label" htmlFor="pos_description">Mô tả chi tiết</label>
-                  <input
-                    type="text"
-                    id="pos_description"
-                    className="input"
-                    placeholder="Mô tả công việc (không bắt buộc)"
-                    value={posFormData.description || ''}
-                    onChange={(e) => setPosFormData({ ...posFormData, description: e.target.value })}
-                  />
+                  <label className="form-label">Mô tả</label>
+                  <input type="text" className="input" value={titleFormData.description || ''} onChange={(e) => setTitleFormData({ ...titleFormData, description: e.target.value })} />
                 </div>
                 <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
-                  {editingPosition && (
-                    <button
-                      type="button"
-                      className="btn btn--secondary"
-                      onClick={() => {
-                        setEditingPosition(null);
-                        setPosFormData({ name: '', description: '' });
-                      }}
-                      style={{ padding: '6px 12px', fontSize: '13px' }}
-                    >
-                      Hủy sửa
-                    </button>
+                  {editingTitle && (
+                    <button type="button" className="btn btn--secondary" onClick={() => { setEditingTitle(null); setTitleFormData({ name: '', description: '' }); }}>Hủy sửa</button>
                   )}
-                  <button
-                    type="submit"
-                    className="btn btn--primary"
-                    style={{ padding: '6px 16px', fontSize: '13px' }}
-                  >
-                    {editingPosition ? 'Cập nhật' : 'Thêm mới'}
-                  </button>
+                  <button type="submit" className="btn btn--primary">{editingTitle ? 'Cập nhật' : 'Thêm mới'}</button>
                 </div>
               </form>
-
-              {/* Danh sách vị trí hiện có */}
-              <h4 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px', color: 'var(--color-text-primary)' }}>
-                Danh sách Vị trí hiện tại ({positions.length})
-              </h4>
-              
-              {positions.length === 0 ? (
-                <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', fontStyle: 'italic', textAlign: 'center', padding: '16px' }}>
-                  Chưa có vị trí công việc nào được định nghĩa.
-                </p>
-              ) : (
-                <div className="table-responsive" style={{ border: '1px solid #dee2e6', borderRadius: '4px' }}>
-                  <table className="table" style={{ fontSize: '13px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#f1f3f5' }}>
-                        <th style={{ padding: '10px' }}>Tên vị trí</th>
-                        <th style={{ padding: '10px' }}>Mô tả</th>
-                        <th style={{ padding: '10px', textAlign: 'right' }}>Thao tác</th>
+              <h4 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>Danh sách ({titles.length})</h4>
+              <div className="table-responsive" style={{ border: '1px solid #dee2e6', borderRadius: '4px' }}>
+                <table className="table">
+                  <thead><tr style={{ backgroundColor: '#f1f3f5' }}><th>Tên chức vụ</th><th>Mô tả</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>
+                  <tbody>
+                    {titles.map((t) => (
+                      <tr key={t.id}>
+                        <td style={{ fontWeight: 600 }}>{t.name}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{t.description || '---'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                            <button type="button" className="btn btn--icon" onClick={() => { setEditingTitle(t); setTitleFormData({ name: t.name, description: t.description || '' }); }}><Edit size={13} /></button>
+                            <button type="button" className="btn btn--icon btn--icon-danger" onClick={() => handleDeleteTitle(t)}><Trash2 size={13} /></button>
+                          </div>
+                        </td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {positions.map((pos) => (
-                        <tr key={pos.id}>
-                          <td style={{ fontWeight: 600, padding: '10px' }}>{pos.name}</td>
-                          <td style={{ color: 'var(--color-text-muted)', padding: '10px' }}>{pos.description || '---'}</td>
-                          <td style={{ padding: '10px', textAlign: 'right' }}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
-                              <button
-                                type="button"
-                                className="btn btn--icon"
-                                style={{ width: '28px', height: '28px' }}
-                                title="Sửa vị trí"
-                                onClick={() => {
-                                  setEditingPosition(pos);
-                                  setPosFormData({ name: pos.name, description: pos.description || '' });
-                                }}
-                              >
-                                <Edit size={13} />
-                              </button>
-                              <button
-                                type="button"
-                                className="btn btn--icon btn--icon-danger"
-                                style={{ width: '28px', height: '28px' }}
-                                title="Xóa vị trí"
-                                onClick={() => handleDeletePosition(pos)}
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-            <div className="modal__footer">
-              <button type="button" className="btn btn--secondary" onClick={() => setIsPositionModalOpen(false)}>
-                Đóng
-              </button>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
         </div>
       )}
+
+      {/* Modal Quản lý Phòng ban */}
+      {isDeptModalOpen && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '600px' }}>
+            <div className="modal__header">
+              <h3 className="modal__title">Quản lý Phòng ban</h3>
+              <button className="modal__close" onClick={() => setIsDeptModalOpen(false)}>&times;</button>
+            </div>
+            <div className="modal__body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+              <form onSubmit={handleSaveDepartment} style={{ marginBottom: '24px', padding: '16px', backgroundColor: '#f8f9fa', borderRadius: '6px', border: '1px solid #dee2e6' }}>
+                <h4 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px', color: 'var(--color-primary-dark)' }}>
+                  {editingDept ? `Chỉnh sửa phòng ban: ${editingDept.name}` : 'Thêm phòng ban mới'}
+                </h4>
+                <div className="form-group" style={{ marginBottom: '12px' }}>
+                  <label className="form-label form-label--required">Tên phòng ban</label>
+                  <input type="text" className="input" value={deptFormData.name} onChange={(e) => setDeptFormData({ ...deptFormData, name: e.target.value })} required />
+                </div>
+                <div className="form-group" style={{ marginBottom: '16px' }}>
+                  <label className="form-label">Mô tả</label>
+                  <input type="text" className="input" value={deptFormData.description || ''} onChange={(e) => setDeptFormData({ ...deptFormData, description: e.target.value })} />
+                </div>
+                <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+                  {editingDept && (
+                    <button type="button" className="btn btn--secondary" onClick={() => { setEditingDept(null); setDeptFormData({ name: '', description: '' }); }}>Hủy sửa</button>
+                  )}
+                  <button type="submit" className="btn btn--primary">{editingDept ? 'Cập nhật' : 'Thêm mới'}</button>
+                </div>
+              </form>
+              <h4 style={{ fontSize: '15px', fontWeight: 600, marginBottom: '12px' }}>Danh sách ({departments.length})</h4>
+              <div className="table-responsive" style={{ border: '1px solid #dee2e6', borderRadius: '4px' }}>
+                <table className="table">
+                  <thead><tr style={{ backgroundColor: '#f1f3f5' }}><th>Tên phòng ban</th><th>Mô tả</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>
+                  <tbody>
+                    {departments.map((d) => (
+                      <tr key={d.id}>
+                        <td style={{ fontWeight: 600 }}>{d.name}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{d.description || '---'}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '6px' }}>
+                            <button type="button" className="btn btn--icon" onClick={() => { setEditingDept(d); setDeptFormData({ name: d.name, description: d.description || '' }); }}><Edit size={13} /></button>
+                            <button type="button" className="btn btn--icon btn--icon-danger" onClick={() => handleDeleteDepartment(d)}><Trash2 size={13} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };

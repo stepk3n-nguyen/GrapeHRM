@@ -37,6 +37,8 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
     # ── Thông tin công việc ──────────────────────────────────────────
 
     joined_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
+    address = db.Column(db.Text, nullable=True)
 
     # Trạng thái nhân viên: đang làm việc hay đã nghỉ
     state = db.Column(
@@ -47,10 +49,17 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
     # Ảnh đại diện
     profile_pic_url = db.Column(db.Text, nullable=True)
 
-    # Vị trí công việc (Job Position)
-    position_id = db.Column(
+    # Chức vụ (Job Title)
+    title_id = db.Column(
         db.Integer,
-        db.ForeignKey("job_positions.id", ondelete="SET NULL"),
+        db.ForeignKey("job_titles.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+
+    # Phòng ban (Department)
+    department_id = db.Column(
+        db.Integer,
+        db.ForeignKey("departments.id", ondelete="SET NULL"),
         nullable=True,
     )
 
@@ -80,17 +89,33 @@ class EmployeeSequence(db.Model):
         return f"<EmployeeSequence tenant={self.tenant_id} val={self.current_value}>"
 
 
-class JobPosition(TenantMixin, TimestampMixin, db.Model):
-    """Bảng job_positions — danh sách chức vụ/vị trí công việc."""
+class JobTitle(TenantMixin, TimestampMixin, db.Model):
+    """Bảng job_titles — danh sách chức vụ công việc."""
 
-    __tablename__ = "job_positions"
+    __tablename__ = "job_titles"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), nullable=False)
     description = db.Column(db.String(255), nullable=True)
 
-    # Quan hệ ngược lại (1 Position -> nhiều Employees)
-    employees = db.relationship("Employee", backref="position", lazy=True)
+    # Quan hệ ngược lại (1 Title -> nhiều Employees)
+    employees = db.relationship("Employee", backref="title", lazy=True)
 
     def __repr__(self):
-        return f"<JobPosition {self.name} tenant={self.tenant_id}>"
+        return f"<JobTitle {self.name} tenant={self.tenant_id}>"
+
+
+class Department(TenantMixin, TimestampMixin, db.Model):
+    """Bảng departments — danh sách phòng ban."""
+
+    __tablename__ = "departments"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(100), nullable=False)
+    description = db.Column(db.String(255), nullable=True)
+
+    # Quan hệ ngược lại (1 Department -> nhiều Employees)
+    employees = db.relationship("Employee", backref="department", lazy=True)
+
+    def __repr__(self):
+        return f"<Department {self.name} tenant={self.tenant_id}>"

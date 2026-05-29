@@ -14,7 +14,7 @@ from flask import Blueprint, request, jsonify, g
 from flask_jwt_extended import jwt_required
 
 from app.extensions import db
-from app.models.employee import Employee, EmployeeSequence, JobPosition
+from app.models.employee import Employee, EmployeeSequence, JobTitle, Department
 
 employee_bp = Blueprint("employee", __name__, url_prefix="/api/employees")
 
@@ -68,6 +68,18 @@ def parse_date(date_str):
 
 def serialize_employee(emp):
     """Serialize đối tượng Employee thành dictionary JSON-friendly."""
+    # Tự động đồng bộ state nếu có end_date
+    if emp.end_date:
+        from datetime import date
+        today = date.today()
+        expected_state = "TERMINATED" if emp.end_date <= today else "ACTIVE"
+        if emp.state != expected_state:
+            emp.state = expected_state
+            db.session.commit()
+    elif emp.state != "ACTIVE":
+        emp.state = "ACTIVE"
+        db.session.commit()
+
     return {
         "id": emp.id,
         "tenant_id": emp.tenant_id,
@@ -81,10 +93,14 @@ def serialize_employee(emp):
         "mobile": emp.mobile,
         "work_email": emp.work_email,
         "joined_date": emp.joined_date.isoformat() if emp.joined_date else None,
+        "end_date": emp.end_date.isoformat() if emp.end_date else None,
+        "address": emp.address,
         "state": emp.state,
         "profile_pic_url": emp.profile_pic_url,
-        "position_id": emp.position_id,
-        "position_name": emp.position.name if emp.position else None,
+        "title_id": emp.title_id,
+        "title_name": emp.title.name if emp.title else None,
+        "department_id": emp.department_id,
+        "department_name": emp.department.name if emp.department else None,
         "created_at": emp.created_at.isoformat() if emp.created_at else None,
         "updated_at": emp.updated_at.isoformat() if emp.updated_at else None,
     }
@@ -167,16 +183,30 @@ def create_employee():
     mobile = data.get("mobile", "").strip() or None
     work_email = data.get("work_email", "").strip() or None
     joined_date = parse_date(data.get("joined_date"))
-    state = data.get("state", "ACTIVE")
-    if state not in ("ACTIVE", "TERMINATED"):
-        state = "ACTIVE"
+    end_date = parse_date(data.get("end_date"))
+    address = data.get("address", "").strip() or None
+    
+    state = "ACTIVE"
+    if end_date:
+        from datetime import date
+        if end_date <= date.today():
+            state = "TERMINATED"
+
     profile_pic_url = data.get("profile_pic_url", "").strip() or None
-    position_id = data.get("position_id")
-    if position_id is not None:
+    
+    title_id = data.get("title_id")
+    if title_id is not None:
         try:
-            position_id = int(position_id) if position_id else None
+            title_id = int(title_id) if title_id else None
         except ValueError:
-            position_id = None
+            title_id = None
+            
+    department_id = data.get("department_id")
+    if department_id is not None:
+        try:
+            department_id = int(department_id) if department_id else None
+        except ValueError:
+            department_id = None
 
     new_emp = Employee(
         tenant_id=tenant_id,
@@ -189,9 +219,12 @@ def create_employee():
         mobile=mobile,
         work_email=work_email,
         joined_date=joined_date,
+        end_date=end_date,
+        address=address,
         state=state,
         profile_pic_url=profile_pic_url,
-        position_id=position_id,
+        title_id=title_id,
+        department_id=department_id,
     )
 
     db.session.add(new_emp)
@@ -254,16 +287,30 @@ def update_employee(emp_id):
         emp.work_email = data.get("work_email", "").strip() or None
     if "joined_date" in data:
         emp.joined_date = parse_date(data.get("joined_date"))
-    if "state" in data:
-        state = data.get("state")
-        if state in ("ACTIVE", "TERMINATED"):
-            emp.state = state
+    if "end_date" in data:
+        emp.end_date = parse_date(data.get("end_date"))
+    if "address" in data:
+        emp.address = data.get("address", "").strip() or None
+        
+    # Auto calc state
+    if emp.end_date:
+        from datetime import date
+        emp.state = "TERMINATED" if emp.end_date <= date.today() else "ACTIVE"
+    else:
+        emp.state = "ACTIVE"
+
     if "profile_pic_url" in data:
         emp.profile_pic_url = data.get("profile_pic_url", "").strip() or None
-    if "position_id" in data:
-        pos_id = data.get("position_id")
+    if "title_id" in data:
+        t_id = data.get("title_id")
         try:
-            emp.position_id = int(pos_id) if pos_id else None
+            emp.title_id = int(t_id) if t_id else None
+        except ValueError:
+            pass
+    if "department_id" in data:
+        d_id = data.get("department_id")
+        try:
+            emp.department_id = int(d_id) if d_id else None
         except ValueError:
             pass
 
@@ -292,12 +339,12 @@ def delete_employee(emp_id):
     return jsonify({"message": "Xóa nhân sự thành công"}), 200
 
 
-# ── BLUEPRINT & ENDPOINTS CHO QUẢN LÝ VỊ TRÍ CÔNG VIỆC (JOB POSITION) ─────
+# ── BLUEPRINT & ENDPOINTS CHO QUẢN LÝ CHỨC VỤ (JOB TITLE) ─────
 
-position_bp = Blueprint("position", __name__, url_prefix="/api/positions")
+title_bp = Blueprint("title", __name__, url_prefix="/api/job-titles")
 
 
-def serialize_position(pos):
+def serialize_title(pos):
     return {
         "id": pos.id,
         "tenant_id": pos.tenant_id,
@@ -307,39 +354,39 @@ def serialize_position(pos):
     }
 
 
-@position_bp.route("", methods=["GET"])
+@title_bp.route("", methods=["GET"])
 @jwt_required()
-def get_positions():
-    """Lấy danh sách tất cả vị trí công việc của tenant."""
+def get_titles():
+    """Lấy danh sách tất cả chức vụ của tenant."""
     tenant_id = g.tenant_id
     if not tenant_id:
         return jsonify({"error": "Không xác định được Tenant ID"}), 403
 
-    positions = JobPosition.query.filter_by(tenant_id=tenant_id).order_by(JobPosition.name.asc()).all()
-    return jsonify([serialize_position(pos) for pos in positions]), 200
+    titles = JobTitle.query.filter_by(tenant_id=tenant_id).order_by(JobTitle.name.asc()).all()
+    return jsonify([serialize_title(t) for t in titles]), 200
 
 
-@position_bp.route("", methods=["POST"])
+@title_bp.route("", methods=["POST"])
 @jwt_required()
-def create_position():
-    """Thêm mới một vị trí công việc cho tenant."""
+def create_title():
+    """Thêm mới một chức vụ cho tenant."""
     tenant_id = g.tenant_id
     if not tenant_id:
         return jsonify({"error": "Không xác định được Tenant ID"}), 403
 
     data = request.get_json(silent=True)
     if not data or not data.get("name", "").strip():
-        return jsonify({"error": "Tên vị trí công việc là bắt buộc"}), 400
+        return jsonify({"error": "Tên chức vụ là bắt buộc"}), 400
 
     name = data.get("name").strip()
     description = data.get("description", "").strip() or None
 
     # Kiểm tra trùng tên trong cùng tenant
-    existing = JobPosition.query.filter_by(tenant_id=tenant_id, name=name).first()
+    existing = JobTitle.query.filter_by(tenant_id=tenant_id, name=name).first()
     if existing:
-        return jsonify({"error": "Vị trí công việc này đã tồn tại"}), 400
+        return jsonify({"error": "Chức vụ này đã tồn tại"}), 400
 
-    new_pos = JobPosition(
+    new_pos = JobTitle(
         tenant_id=tenant_id,
         name=name,
         description=description,
@@ -348,52 +395,148 @@ def create_position():
     db.session.commit()
 
     return jsonify({
-        "message": "Thêm vị trí công việc thành công",
-        "position": serialize_position(new_pos)
+        "message": "Thêm chức vụ thành công",
+        "title": serialize_title(new_pos)
     }), 201
 
 
-@position_bp.route("/<int:pos_id>", methods=["PUT"])
+@title_bp.route("/<int:pos_id>", methods=["PUT"])
 @jwt_required()
-def update_position(pos_id):
-    """Cập nhật tên hoặc mô tả vị trí công việc."""
+def update_title(pos_id):
+    """Cập nhật tên hoặc mô tả chức vụ."""
     tenant_id = g.tenant_id
-    pos = JobPosition.query.filter_by(id=pos_id, tenant_id=tenant_id).first()
+    pos = JobTitle.query.filter_by(id=pos_id, tenant_id=tenant_id).first()
     if not pos:
-        return jsonify({"error": "Không tìm thấy vị trí công việc"}), 404
+        return jsonify({"error": "Không tìm thấy chức vụ"}), 404
 
     data = request.get_json(silent=True)
     if not data or not data.get("name", "").strip():
-        return jsonify({"error": "Tên vị trí công việc là bắt buộc"}), 400
+        return jsonify({"error": "Tên chức vụ là bắt buộc"}), 400
 
     name = data.get("name").strip()
     description = data.get("description", "").strip() or None
 
     # Kiểm tra trùng tên với các vị trí khác
-    existing = JobPosition.query.filter_by(tenant_id=tenant_id, name=name).filter(JobPosition.id != pos_id).first()
+    existing = JobTitle.query.filter_by(tenant_id=tenant_id, name=name).filter(JobTitle.id != pos_id).first()
     if existing:
-        return jsonify({"error": "Vị trí công việc với tên này đã tồn tại"}), 400
+        return jsonify({"error": "Chức vụ với tên này đã tồn tại"}), 400
 
     pos.name = name
     pos.description = description
     db.session.commit()
 
     return jsonify({
-        "message": "Cập nhật vị trí công việc thành công",
-        "position": serialize_position(pos)
+        "message": "Cập nhật chức vụ thành công",
+        "title": serialize_title(pos)
     }), 200
 
 
-@position_bp.route("/<int:pos_id>", methods=["DELETE"])
+@title_bp.route("/<int:pos_id>", methods=["DELETE"])
 @jwt_required()
-def delete_position(pos_id):
-    """Xóa vị trí công việc khỏi hệ thống (soft/hard delete)."""
+def delete_title(pos_id):
+    """Xóa chức vụ khỏi hệ thống."""
     tenant_id = g.tenant_id
-    pos = JobPosition.query.filter_by(id=pos_id, tenant_id=tenant_id).first()
+    pos = JobTitle.query.filter_by(id=pos_id, tenant_id=tenant_id).first()
     if not pos:
-        return jsonify({"error": "Không tìm thấy vị trí công việc"}), 404
+        return jsonify({"error": "Không tìm thấy chức vụ"}), 404
 
     db.session.delete(pos)
     db.session.commit()
 
-    return jsonify({"message": "Xóa vị trí công việc thành công"}), 200
+    return jsonify({"message": "Xóa chức vụ thành công"}), 200
+
+
+# ── BLUEPRINT & ENDPOINTS CHO QUẢN LÝ PHÒNG BAN (DEPARTMENT) ─────
+
+department_bp = Blueprint("department", __name__, url_prefix="/api/departments")
+
+def serialize_department(dept):
+    return {
+        "id": dept.id,
+        "tenant_id": dept.tenant_id,
+        "name": dept.name,
+        "description": dept.description,
+        "created_at": dept.created_at.isoformat() if dept.created_at else None,
+    }
+
+@department_bp.route("", methods=["GET"])
+@jwt_required()
+def get_departments():
+    """Lấy danh sách tất cả phòng ban của tenant."""
+    tenant_id = g.tenant_id
+    if not tenant_id:
+        return jsonify({"error": "Không xác định được Tenant ID"}), 403
+
+    departments = Department.query.filter_by(tenant_id=tenant_id).order_by(Department.name.asc()).all()
+    return jsonify([serialize_department(d) for d in departments]), 200
+
+@department_bp.route("", methods=["POST"])
+@jwt_required()
+def create_department():
+    """Thêm mới phòng ban."""
+    tenant_id = g.tenant_id
+    if not tenant_id:
+        return jsonify({"error": "Không xác định được Tenant ID"}), 403
+
+    data = request.get_json(silent=True)
+    if not data or not data.get("name", "").strip():
+        return jsonify({"error": "Tên phòng ban là bắt buộc"}), 400
+
+    name = data.get("name").strip()
+    description = data.get("description", "").strip() or None
+
+    existing = Department.query.filter_by(tenant_id=tenant_id, name=name).first()
+    if existing:
+        return jsonify({"error": "Phòng ban này đã tồn tại"}), 400
+
+    new_dept = Department(tenant_id=tenant_id, name=name, description=description)
+    db.session.add(new_dept)
+    db.session.commit()
+
+    return jsonify({
+        "message": "Thêm phòng ban thành công",
+        "department": serialize_department(new_dept)
+    }), 201
+
+@department_bp.route("/<int:dept_id>", methods=["PUT"])
+@jwt_required()
+def update_department(dept_id):
+    """Cập nhật phòng ban."""
+    tenant_id = g.tenant_id
+    dept = Department.query.filter_by(id=dept_id, tenant_id=tenant_id).first()
+    if not dept:
+        return jsonify({"error": "Không tìm thấy phòng ban"}), 404
+
+    data = request.get_json(silent=True)
+    if not data or not data.get("name", "").strip():
+        return jsonify({"error": "Tên phòng ban là bắt buộc"}), 400
+
+    name = data.get("name").strip()
+    description = data.get("description", "").strip() or None
+
+    existing = Department.query.filter_by(tenant_id=tenant_id, name=name).filter(Department.id != dept_id).first()
+    if existing:
+        return jsonify({"error": "Tên phòng ban này đã tồn tại"}), 400
+
+    dept.name = name
+    dept.description = description
+    db.session.commit()
+
+    return jsonify({
+        "message": "Cập nhật phòng ban thành công",
+        "department": serialize_department(dept)
+    }), 200
+
+@department_bp.route("/<int:dept_id>", methods=["DELETE"])
+@jwt_required()
+def delete_department(dept_id):
+    """Xóa phòng ban."""
+    tenant_id = g.tenant_id
+    dept = Department.query.filter_by(id=dept_id, tenant_id=tenant_id).first()
+    if not dept:
+        return jsonify({"error": "Không tìm thấy phòng ban"}), 404
+
+    db.session.delete(dept)
+    db.session.commit()
+
+    return jsonify({"message": "Xóa phòng ban thành công"}), 200

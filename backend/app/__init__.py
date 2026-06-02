@@ -62,6 +62,16 @@ def create_app(config_name: str = None) -> Flask:
     app.register_blueprint(title_bp)
     app.register_blueprint(department_bp)
 
+    from app.leave.routes import (
+        leave_type_bp, leave_policy_bp, leave_request_bp,
+        leave_balance_bp, attendance_bp
+    )
+    app.register_blueprint(leave_type_bp)
+    app.register_blueprint(leave_policy_bp)
+    app.register_blueprint(leave_request_bp)
+    app.register_blueprint(leave_balance_bp)
+    app.register_blueprint(attendance_bp)
+
     # ── Route kiểm tra sức khỏe (health check) ──────────────────────
     @app.route("/api/health")
     def health():

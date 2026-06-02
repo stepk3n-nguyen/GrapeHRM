@@ -49,3 +49,46 @@ def seed_initial_data():
         print("[SEED] Đã tạo tài khoản admin (mật khẩu: admin123)")
 
     db.session.commit()
+
+    # ── Seed Dữ liệu nghỉ phép cơ bản (Leave Types) ─────────────────
+    from app.models.leave import LeaveType, LeavePolicy, LeavePolicyDetail
+    
+    default_types = [
+        {"name": "Nghỉ phép năm", "code": "ANNUAL", "is_paid": True, "max_days": 12},
+        {"name": "Nghỉ ốm", "code": "SICK", "is_paid": True, "max_days": 5},
+        {"name": "Nghỉ thai sản", "code": "MATERNITY", "is_paid": True, "max_days": 0},
+        {"name": "Nghỉ không lương", "code": "UNPAID", "is_paid": False, "max_days": 0},
+        {"name": "Nghỉ kết hôn", "code": "WEDDING", "is_paid": True, "max_days": 3},
+        {"name": "Nghỉ tang chế", "code": "BEREAVEMENT", "is_paid": True, "max_days": 3},
+    ]
+
+    type_objects = {}
+    for t_data in default_types:
+        t = LeaveType.query.filter_by(tenant_id=tenant.id, code=t_data["code"]).first()
+        if not t:
+            t = LeaveType(tenant_id=tenant.id, **t_data)
+            db.session.add(t)
+            db.session.flush()
+        type_objects[t_data["code"]] = t
+
+    # ── Seed Chính sách phép mặc định ──────────────────────────────
+    default_policy = LeavePolicy.query.filter_by(tenant_id=tenant.id, is_default=True).first()
+    if not default_policy:
+        default_policy = LeavePolicy(
+            tenant_id=tenant.id,
+            name="Chính sách phép chuẩn",
+            year_start_month=1,
+            is_default=True
+        )
+        db.session.add(default_policy)
+        db.session.flush()
+
+        # Tạo details cho policy mặc định
+        for code, t_obj in type_objects.items():
+            entitlement = 12 if code == "ANNUAL" else (5 if code == "SICK" else (3 if code in ["WEDDING", "BEREAVEMENT"] else 0))
+            detail = LeavePolicyDetail(policy_id=default_policy.id, leave_type_id=t_obj.id, entitlement=entitlement)
+            db.session.add(detail)
+            
+        print("[SEED] Đã tạo Leave Types và Policy mặc định")
+
+    db.session.commit()

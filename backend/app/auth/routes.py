@@ -8,7 +8,9 @@ Endpoints:
 
 from datetime import datetime, timezone, timedelta
 
+# pyrefly: ignore [missing-import]
 from flask import Blueprint, request, jsonify, current_app
+# pyrefly: ignore [missing-import]
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -76,16 +78,25 @@ def login():
     user.last_login = datetime.now(timezone.utc)
     db.session.commit()
 
+    employee_full_name = None
+    employee_code = None
+    if user.employee:
+        employee_full_name = user.employee.full_name()
+        employee_code = user.employee.employee_id
+
     return jsonify({
         "message": "Đăng nhập thành công",
         "access_token": access_token,
         "refresh_token": refresh_token,
         "user": {
             "id": user.id,
+            "employee_id": user.employee_id,
             "username": user.username,
             "email": user.email,
             "role": user.role,
             "tenant_id": user.tenant_id,
+            "employee_full_name": employee_full_name,
+            "employee_code": employee_code,
         },
     }), 200
 
@@ -134,11 +145,20 @@ def me():
     if user is None:
         return jsonify({"error": "Không tìm thấy tài khoản"}), 404
 
+    employee_full_name = None
+    employee_code = None
+    if user.employee:
+        employee_full_name = user.employee.full_name()
+        employee_code = user.employee.employee_id
+
     return jsonify({
         "id": user.id,
+        "employee_id": user.employee_id,
         "username": user.username,
         "email": user.email,
         "role": user.role,
         "tenant_id": user.tenant_id,
         "last_login": user.last_login.isoformat() if user.last_login else None,
+        "employee_full_name": employee_full_name,
+        "employee_code": employee_code,
     }), 200

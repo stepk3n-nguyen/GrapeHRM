@@ -11,7 +11,12 @@ Endpoints:
 from datetime import datetime
 import re
 from flask import Blueprint, request, jsonify, g
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
+
+def check_hr_admin():
+    """Kiểm tra xem user hiện tại có role là admin hoặc hr_manager không."""
+    claims = get_jwt()
+    return claims.get("role") in ["super_admin", "admin", "hr_manager"]
 
 from app.extensions import db
 from app.models.employee import Employee, EmployeeSequence, JobTitle, Department
@@ -80,6 +85,9 @@ def serialize_employee(emp):
         emp.state = "ACTIVE"
         db.session.commit()
 
+    from app.models.user import User
+    user_record = User.query.filter_by(employee_id=emp.id).first()
+
     return {
         "id": emp.id,
         "tenant_id": emp.tenant_id,
@@ -103,6 +111,8 @@ def serialize_employee(emp):
         "department_name": emp.department.name if emp.department else None,
         "created_at": emp.created_at.isoformat() if emp.created_at else None,
         "updated_at": emp.updated_at.isoformat() if emp.updated_at else None,
+        "role": user_record.role if user_record else None,
+        "user_id": user_record.id if user_record else None,
     }
 
 
@@ -110,6 +120,9 @@ def serialize_employee(emp):
 @jwt_required()
 def get_employees():
     """Lấy danh sách tất cả nhân viên của tenant hiện tại."""
+    if not check_hr_admin():
+        return jsonify({"error": "Không có quyền truy cập"}), 403
+
     tenant_id = g.tenant_id
     if not tenant_id:
         return jsonify({"error": "Không xác định được Tenant ID"}), 403
@@ -118,11 +131,32 @@ def get_employees():
     employees = Employee.query.filter_by(tenant_id=tenant_id).order_by(Employee.created_at.desc()).all()
     return jsonify([serialize_employee(emp) for emp in employees]), 200
 
+@employee_bp.route("/me", methods=["GET"])
+@jwt_required()
+def get_my_profile():
+    """Lấy thông tin cá nhân của user đang đăng nhập."""
+    tenant_id = g.tenant_id
+    user_id = get_jwt_identity()
+    
+    from app.models.user import User
+    user = User.query.get(user_id)
+    if not user or not user.employee_id:
+        return jsonify({"error": "Tài khoản không được liên kết với hồ sơ nhân viên nào"}), 404
+
+    emp = Employee.query.filter_by(id=user.employee_id, tenant_id=tenant_id).first()
+    if not emp:
+        return jsonify({"error": "Không tìm thấy hồ sơ nhân viên"}), 404
+
+    return jsonify(serialize_employee(emp)), 200
+
 
 @employee_bp.route("/next-id", methods=["GET"])
 @jwt_required()
 def get_next_employee_id_route():
     """Lấy mã nhân sự tiếp theo (dành cho việc tạo mới)."""
+    if not check_hr_admin():
+        return jsonify({"error": "Không có quyền truy cập"}), 403
+
     tenant_id = g.tenant_id
     if not tenant_id:
         return jsonify({"error": "Không xác định được Tenant ID"}), 403
@@ -153,6 +187,9 @@ def get_next_employee_id_route():
 @jwt_required()
 def create_employee():
     """Tạo mới một nhân sự cho tenant."""
+    if not check_hr_admin():
+        return jsonify({"error": "Không có quyền truy cập"}), 403
+
     tenant_id = g.tenant_id
     if not tenant_id:
         return jsonify({"error": "Không xác định được Tenant ID"}), 403
@@ -228,6 +265,24 @@ def create_employee():
     )
 
     db.session.add(new_emp)
+    db.session.flush()
+
+    # Create associated User account
+    role = data.get("role", "employee")
+    from app.models.user import User
+    username = new_emp.employee_id.replace("-", "").lower() if new_emp.employee_id else f"nv{new_emp.id}"
+    
+    new_user = User(
+        tenant_id=tenant_id,
+        employee_id=new_emp.id,
+        username=username,
+        email=work_email or f"{username}@grapecorp.com",
+        role=role,
+        is_active=True
+    )
+    new_user.set_password("123456")
+    db.session.add(new_user)
+
     db.session.commit()
 
     return jsonify({
@@ -313,6 +368,28 @@ def update_employee(emp_id):
             emp.department_id = int(d_id) if d_id else None
         except ValueError:
             pass
+
+    db.session.flush()
+
+    # Handle role update if user is admin
+    role = data.get("role")
+    if role and get_jwt().get("role") == "admin":
+        from app.models.user import User
+        user = User.query.filter_by(employee_id=emp.id).first()
+        if user:
+            user.role = role
+        else:
+            username = emp.employee_id.replace("-", "").lower() if emp.employee_id else f"nv{emp.id}"
+            user = User(
+                tenant_id=tenant_id,
+                employee_id=emp.id,
+                username=username,
+                email=emp.work_email or f"{username}@grapecorp.com",
+                role=role,
+                is_active=True
+            )
+            user.set_password("123456")
+            db.session.add(user)
 
     db.session.commit()
 

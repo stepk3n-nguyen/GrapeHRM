@@ -1,0 +1,3 @@
+"""
+Khởi tạo package leave.
+"""

@@ -7,6 +7,10 @@ import Footer from './components/Footer';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import EmployeePage from './pages/EmployeePage';
+import LeavePage from './pages/LeavePage';
+import AttendancePage from './pages/AttendancePage';
+import LeavePolicyPage from './pages/LeavePolicyPage';
+import ProfilePage from './pages/ProfilePage';
 import { Loader2 } from 'lucide-react';
 
 // Thành phần Component Mock cho các trang chưa phát triển trong Phase này
@@ -35,7 +39,7 @@ const MockPage = ({ title }) => (
 
 // Trình bảo vệ tuyến đường đăng nhập (Authentication Guard)
 const AppContent = () => {
-  const { token, loading } = useAuth();
+  const { user, token, loading } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => 
     typeof window !== 'undefined' ? window.innerWidth > 768 : false
   );
@@ -84,12 +88,26 @@ const AppContent = () => {
         <main className={`app__workspace ${isSidebarOpen ? 'app__workspace--shifted' : ''}`}>
           <div className="app__content">
             <Routes>
-              <Route path="/" element={<DashboardPage />} />
-              <Route path="/employees" element={<EmployeePage />} />
-              <Route path="/recruitment" element={<MockPage title="Phân hệ Tuyển dụng (Recruitment)" />} />
-              <Route path="/leave" element={<MockPage title="Phân hệ Thời gian & Nghỉ phép (Time & Leave)" />} />
-              <Route path="/settings" element={<MockPage title="Hệ thống & Bảo mật (Settings)" />} />
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {user?.role === 'employee' ? (
+                <>
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="/leave" element={<LeavePage />} />
+                  <Route path="/attendance" element={<AttendancePage />} />
+                  <Route path="/" element={<Navigate to="/profile" replace />} />
+                  <Route path="*" element={<Navigate to="/profile" replace />} />
+                </>
+              ) : (
+                <>
+                  <Route path="/" element={<DashboardPage />} />
+                  <Route path="/employees" element={<EmployeePage />} />
+                  {user?.role !== 'admin' && <Route path="/profile" element={<ProfilePage />} />}
+                  <Route path="/leave" element={<LeavePage />} />
+                  <Route path="/attendance" element={<AttendancePage />} />
+                  <Route path="/leave-policy" element={<LeavePolicyPage />} />
+                  <Route path="/settings" element={<MockPage title="Hệ thống & Bảo mật (Settings)" />} />
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </>
+              )}
             </Routes>
           </div>
           

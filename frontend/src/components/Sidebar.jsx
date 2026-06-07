@@ -1,14 +1,21 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, UserPlus, CalendarDays, Settings, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Clock, ClipboardList, Settings } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onCloseSidebar }) => {
+  const { user } = useAuth();
+  
+  const isAdminOrHR = user?.role === 'admin' || user?.role === 'hr_manager';
+
   const menuItems = [
-    { name: 'Dashboard', path: '/', icon: LayoutDashboard },
-    { name: 'Quản lý nhân viên', path: '/employees', icon: Users },
-    { name: 'Tuyển dụng', path: '/recruitment', icon: UserPlus },
-    { name: 'Thời gian & Nghỉ phép', path: '/leave', icon: CalendarDays },
-    { name: 'Hệ thống & Bảo mật', path: '/settings', icon: Settings },
+    ...(isAdminOrHR ? [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
+    ...(user?.role !== 'admin' ? [{ name: 'Thông tin cá nhân', path: '/profile', icon: Users }] : []),
+    ...(isAdminOrHR ? [{ name: 'Quản lý nhân viên', path: '/employees', icon: Users }] : []),
+    { name: 'Nghỉ phép', path: '/leave', icon: CalendarDays },
+    { name: 'Chấm công', path: '/attendance', icon: Clock },
+    ...(isAdminOrHR ? [{ name: 'Chính sách phép', path: '/leave-policy', icon: ClipboardList }] : []),
+    ...(user?.role === 'admin' ? [{ name: 'Hệ thống & Bảo mật', path: '/settings', icon: Settings }] : []),
   ];
 
   const handleLinkClick = () => {

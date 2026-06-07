@@ -326,10 +326,16 @@ textarea {
   transform: none;
 }
 
+.card--hover-blue:hover {
+  transform: none;
+  box-shadow: var(--shadow-sm);
+  background-color: var(--color-primary-light);
+}
+
 .card__header {
   background-color: var(--color-surface-elevated);
   padding: 16px 20px;
-  border-bottom: 1px solid var(--color-border-light);
+  /* border-bottom: 1px solid var(--color-border-light); */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -838,7 +844,142 @@ textarea {
   color: var(--color-success);
 }
 
-/* ── 14. Responsive Breakpoints ───────────────────────────────────────── */
+/* ── 14. Leave & Attendance Module ──────────────────────────────────────── */
+
+/* Leave Tabs */
+.leave-tabs {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.leave-tabs__tab {
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--color-text-muted);
+  font-weight: 600;
+  cursor: pointer;
+  transition: var(--transition-fast);
+}
+
+.leave-tabs__tab:hover {
+  color: var(--color-primary);
+}
+
+.leave-tabs__tab--active {
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
+}
+
+/* Status Badges */
+.status-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.status-badge--warning {
+  background-color: var(--color-warning);
+  color: #fff;
+}
+
+
+
+.status-badge--pending-hr {
+  background-color: var(--color-accent-light);
+  color: var(--color-accent);
+}
+
+.status-badge--approved {
+  background-color: var(--color-success-light);
+  color: var(--color-success);
+}
+
+.status-badge--rejected {
+  background-color: var(--color-error-light);
+  color: var(--color-error);
+}
+
+.status-badge--cancelled {
+  background-color: var(--color-secondary-light);
+  color: var(--color-secondary);
+}
+
+/* Balance Bar */
+.balance-bar {
+  width: 100%;
+  height: 8px;
+  background-color: var(--color-border-light);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.balance-bar__fill {
+  height: 100%;
+  background-color: var(--color-primary);
+  border-radius: 4px;
+  transition: width 0.5s ease;
+}
+
+.balance-bar__fill--warning {
+  background-color: var(--color-warning);
+}
+
+.balance-bar__fill--danger {
+  background-color: var(--color-error);
+}
+
+/* Attendance Table */
+.attendance-table th,
+.attendance-table td {
+  padding: 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+/* Policy Card */
+.policy-card {
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.policy-card__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.policy-card__title {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.policy-card__detail {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--color-border-light);
+}
+
+.policy-card__detail:last-child {
+  border-bottom: none;
+}
+
+/* ── 15. Responsive Breakpoints ───────────────────────────────────────── */
 
 /* Mobile view: xs (< 768px) */
 @media (max-width: 768px) {

@@ -26,7 +26,11 @@ const Header = ({ onToggleSidebar }) => {
       <div className="header__nav">
         {user && (
           <div className="header__user-info">
-            <span className="header__username">{user.username}</span>
+            <span className="header__username">
+              {user.employee_full_name && user.employee_code
+                ? `${user.employee_full_name} (${user.employee_code})`
+                : user.username}
+            </span>
             <span className="header__role">{user.role}</span>
           </div>
         )}

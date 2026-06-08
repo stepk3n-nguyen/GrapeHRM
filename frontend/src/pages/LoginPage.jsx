@@ -13,7 +13,7 @@ const LoginPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     const trimmedUsername = username.trim();
     if (!trimmedUsername || !password) {
       setError('Vui lòng nhập tên tài khoản và mật khẩu.');
@@ -33,10 +33,10 @@ const LoginPage = () => {
     <div className="login-page">
       <div className="login-card">
         <div className="login-card__brand">
-          <img 
-            src={logoFull} 
-            alt="GrapeHRM Logo" 
-            style={{ height: '48px', marginBottom: '8px' }} 
+          <img
+            src={logoFull}
+            alt="GrapeHRM Logo"
+            style={{ height: '48px', marginBottom: '8px' }}
             onError={(e) => {
               // Fallback if svg fails to load
               e.target.style.display = 'none';
@@ -60,15 +60,15 @@ const LoginPage = () => {
           <div className="form-group">
             <label className="form-label" htmlFor="username">Tên tài khoản</label>
             <div style={{ position: 'relative' }}>
-              <User 
-                size={16} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '12px', 
-                  top: '50%', 
+              <User
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
                   transform: 'translateY(-50%)',
-                  color: 'var(--color-text-muted)' 
-                }} 
+                  color: 'var(--color-text-muted)'
+                }}
               />
               <input
                 id="username"
@@ -86,15 +86,15 @@ const LoginPage = () => {
           <div className="form-group" style={{ marginBottom: '24px' }}>
             <label className="form-label" htmlFor="password">Mật khẩu</label>
             <div style={{ position: 'relative' }}>
-              <Lock 
-                size={16} 
-                style={{ 
-                  position: 'absolute', 
-                  left: '12px', 
-                  top: '50%', 
+              <Lock
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
                   transform: 'translateY(-50%)',
-                  color: 'var(--color-text-muted)' 
-                }} 
+                  color: 'var(--color-text-muted)'
+                }}
               />
               <input
                 id="password"
@@ -109,9 +109,9 @@ const LoginPage = () => {
             </div>
           </div>
 
-          <button 
-            type="submit" 
-            className="btn btn--primary" 
+          <button
+            type="submit"
+            className="btn btn--primary"
             style={{ width: '100%', padding: '12px', fontSize: '14px' }}
             disabled={loading}
           >
@@ -126,9 +126,9 @@ const LoginPage = () => {
           </button>
         </form>
 
-        <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '12px', color: 'var(--color-text-muted)' }}>
+        {/* <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '12px', color: 'var(--color-text-muted)' }}>
           <p>Tài khoản mẫu: <strong>admin</strong> / <strong>admin123</strong></p>
-        </div>
+        </div> */}
       </div>
     </div>
   );

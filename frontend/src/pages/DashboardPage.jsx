@@ -5,6 +5,7 @@ import { Users, UserCheck, CalendarRange, Landmark, HelpCircle, ArrowRight } fro
 const DashboardPage = () => {
   const { user, getAuthHeaders } = useAuth();
   const [employeeCount, setEmployeeCount] = useState('...');
+  const [pendingLeaveCount, setPendingLeaveCount] = useState('...');
 
   useEffect(() => {
     const fetchEmployeeCount = async () => {
@@ -25,13 +26,30 @@ const DashboardPage = () => {
       }
     };
 
+      const fetchPendingLeaves = async () => {
+      try {
+        let count = 0;
+        if (user?.role === 'admin' || user?.role === 'hr_manager') {
+          const hrRes = await fetch('/api/leave-requests?status=PENDING_HR', { headers: getAuthHeaders() });
+          if (hrRes.ok) {
+            const hrData = await hrRes.json();
+            count += hrData.length;
+          }
+        }
+        setPendingLeaveCount(String(count));
+      } catch (err) {
+        setPendingLeaveCount('N/A');
+      }
+    };
+
     fetchEmployeeCount();
+    fetchPendingLeaves();
   }, []);
 
   const widgets = [
     { label: 'Tổng nhân viên', value: employeeCount, icon: Users, variant: 'primary' },
     { label: 'Đang tuyển dụng', value: '4', icon: UserCheck, variant: 'accent' },
-    { label: 'Yêu cầu nghỉ phép', value: '3', icon: CalendarRange, variant: 'success' },
+    { label: 'Yêu cầu nghỉ phép', value: pendingLeaveCount, icon: CalendarRange, variant: 'success' },
   ];
 
   return (

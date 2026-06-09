@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 const EmployeePage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { getAuthHeaders, user } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -43,7 +43,8 @@ const EmployeePage = () => {
     address: '',
     title_id: '',
     department_id: '',
-    profile_pic_url: ''
+    profile_pic_url: '',
+    role: 'employee'
   });
 
   // Trạng thái Toast thông báo
@@ -151,7 +152,8 @@ const EmployeePage = () => {
       address: '',
       title_id: '',
       department_id: '',
-      profile_pic_url: ''
+      profile_pic_url: '',
+      role: 'employee'
     });
     setIsModalOpen(true);
   };
@@ -173,7 +175,8 @@ const EmployeePage = () => {
       address: emp.address || '',
       title_id: emp.title_id !== null ? String(emp.title_id) : '',
       department_id: emp.department_id !== null ? String(emp.department_id) : '',
-      profile_pic_url: emp.profile_pic_url || ''
+      profile_pic_url: emp.profile_pic_url || '',
+      role: emp.role || 'employee'
     });
     setIsModalOpen(true);
   };
@@ -421,6 +424,7 @@ const EmployeePage = () => {
                     <th>Ảnh</th>
                     <th>Mã NV</th>
                     <th>Họ và Tên</th>
+                    <th>Vai trò</th>
                     <th>Chức vụ</th>
                     <th>Phòng ban</th>
                     <th>Email Công việc</th>
@@ -460,6 +464,11 @@ const EmployeePage = () => {
                       </td>
                       <td style={{ fontWeight: 500, color: 'var(--color-primary-dark)' }}>
                         {emp.full_name}
+                      </td>
+                      <td>
+                        <span className={`badge ${emp.role === 'admin' ? 'badge--danger' : emp.role === 'hr_manager' ? 'badge--warning' : 'badge--primary'}`} style={{textTransform: 'capitalize'}}>
+                          {emp.role ? emp.role.replace('_', ' ') : 'employee'}
+                        </span>
                       </td>
                       <td style={{ fontWeight: 500 }}>
                         {emp.title_name || <span style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>Không có</span>}
@@ -701,6 +710,29 @@ const EmployeePage = () => {
                     />
                   </div>
                 </div>
+
+                {/* Hàng Phân quyền (chỉ dành cho admin) */}
+                {user?.role === 'admin' && (
+                  <div style={{ marginBottom: '16px' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label form-label--required" htmlFor="role">Vai trò hệ thống</label>
+                      <select 
+                        id="role" 
+                        className="input" 
+                        value={formData.role}
+                        onChange={(e) => setFormData({ ...formData, role: e.target.value })}
+                        required
+                      >
+                        <option value="employee">Nhân viên (Employee)</option>
+                        <option value="hr_manager">Quản lý Nhân sự (HR Manager)</option>
+                        <option value="admin">Quản trị viên (Admin)</option>
+                      </select>
+                      <small style={{ color: 'var(--color-text-muted)', marginTop: '4px', display: 'block' }}>
+                        Tài khoản đăng nhập tự động là <b>nvXXX</b> với mật khẩu mặc định <b>123456</b>
+                      </small>
+                    </div>
+                  </div>
+                )}
 
                 {/* Hàng 6 */}
                 <div style={{ marginBottom: '16px' }}>

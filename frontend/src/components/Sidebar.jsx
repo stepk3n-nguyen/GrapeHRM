@@ -1,12 +1,13 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Clock, ClipboardList, Settings } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Clock, ClipboardList, Settings, Mail } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onCloseSidebar }) => {
   const { user } = useAuth();
   
-  const isAdminOrHR = user?.role === 'admin' || user?.role === 'hr_manager';
+  const isAdminOrHR = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr_manager';
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const menuItems = [
     ...(isAdminOrHR ? [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
@@ -15,7 +16,8 @@ const Sidebar = ({ isOpen, onCloseSidebar }) => {
     { name: 'Nghỉ phép', path: '/leave', icon: CalendarDays },
     { name: 'Chấm công', path: '/attendance', icon: Clock },
     ...(isAdminOrHR ? [{ name: 'Chính sách phép', path: '/leave-policy', icon: ClipboardList }] : []),
-    ...(user?.role === 'admin' ? [{ name: 'Hệ thống & Bảo mật', path: '/settings', icon: Settings }] : []),
+    ...(isAdmin ? [{ name: 'Cấu hình Email', path: '/email-settings', icon: Mail }] : []),
+    ...(isAdmin ? [{ name: 'Hệ thống & Bảo mật', path: '/settings', icon: Settings }] : []),
   ];
 
   const handleLinkClick = () => {

@@ -10,6 +10,7 @@ import EmployeePage from './pages/EmployeePage';
 import LeavePage from './pages/LeavePage';
 import AttendancePage from './pages/AttendancePage';
 import LeavePolicyPage from './pages/LeavePolicyPage';
+import EmailSettingsPage from './pages/EmailSettingsPage';
 import ProfilePage from './pages/ProfilePage';
 import { Loader2 } from 'lucide-react';
 
@@ -104,6 +105,7 @@ const AppContent = () => {
                   <Route path="/leave" element={<LeavePage />} />
                   <Route path="/attendance" element={<AttendancePage />} />
                   <Route path="/leave-policy" element={<LeavePolicyPage />} />
+                  <Route path="/email-settings" element={<EmailSettingsPage />} />
                   <Route path="/settings" element={<MockPage title="Hệ thống & Bảo mật (Settings)" />} />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </>

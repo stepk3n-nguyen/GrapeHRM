@@ -20,7 +20,8 @@ from app.models.user import User
 from app.services.email_service import (
     send_leave_request_submitted_email,
     send_leave_final_approved_email,
-    send_leave_rejected_email
+    send_leave_rejected_email,
+    send_leave_cancelled_email
 )
 
 def check_hr_admin():
@@ -392,6 +393,21 @@ def cancel_request(req_id):
         
     req.status = "CANCELLED"
     db.session.commit()
+    
+    # Gửi email thông báo hủy cho tất cả HR
+    hrs = User.query.filter_by(tenant_id=g.tenant_id, role="hr_manager", is_active=True).all()
+    for hr in hrs:
+        if hr.email:
+            app = current_app._get_current_object()
+            send_leave_cancelled_email(
+                app,
+                hr_email=hr.email,
+                employee_name=req.employee.full_name(),
+                leave_type_name=req.leave_type.name,
+                start_date=req.start_date,
+                end_date=req.end_date
+            )
+            
     return jsonify({"message": "Đã hủy đơn"}), 200
 
 

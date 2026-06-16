@@ -10,7 +10,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 
 
-def _send_email_async(app, recipient, subject, body):
+def _send_email_async(app, recipient, subject, body, is_html=False, tenant_id=None):
     """
     Hàm thực thi việc kết nối SMTP và gửi email.
     Chạy trong context của app (để lấy config) nhưng ở thread riêng.
@@ -30,13 +30,19 @@ def _send_email_async(app, recipient, subject, body):
             print(f"[EMAIL MOCK] Tiêu đề: {subject}")
             return
 
+        from app.models.email_log import EmailLog
+        from app.extensions import db
+
         try:
             # Tạo gói tin email
             msg = EmailMessage()
             msg["Subject"] = subject
             msg["From"] = formataddr(("GrapeHRM", sender)) if "<" not in sender else sender
             msg["To"] = recipient
-            msg.set_content(body)
+            if is_html:
+                msg.add_alternative(body, subtype='html')
+            else:
+                msg.set_content(body)
 
             # Kết nối SMTP
             server = smtplib.SMTP(smtp_server, smtp_port, timeout=10)
@@ -54,12 +60,24 @@ def _send_email_async(app, recipient, subject, body):
             
             print(f"[EMAIL] Gửi email thành công tới: {recipient}")
             
+            # Log thành công
+            log = EmailLog(tenant_id=tenant_id, recipient=recipient, subject=subject, status='SENT')
+            db.session.add(log)
+            db.session.commit()
+            
         except Exception as e:
             # Chỉ log lỗi, không crash app chính vì chạy thread riêng
             print(f"[EMAIL ERROR] Gửi thất bại tới {recipient}. Lỗi: {str(e)}")
+            
+            # Log lỗi
+            log = EmailLog(tenant_id=tenant_id, recipient=recipient, subject=subject, status='FAILED', error_message=str(e))
+            db.session.add(log)
+            try:
+                db.session.commit()
+            except Exception:
+                pass
 
-
-def send_email(app, recipient: str, subject: str, body: str):
+def send_email(app, recipient: str, subject: str, body: str, is_html: bool = False, tenant_id=None):
     """
     Hàm gọi từ ứng dụng (views/controllers).
     Khởi tạo một background thread để gửi email.
@@ -68,15 +86,26 @@ def send_email(app, recipient: str, subject: str, body: str):
         app: Flask app instance.
         recipient: Địa chỉ email người nhận.
         subject: Tiêu đề email.
-        body: Nội dung email (plain text).
+        body: Nội dung email (plain text/html).
+        is_html: Có phải là html không.
+        tenant_id: Mã tenant (nếu có).
     """
     if not recipient:
         return
 
+    # Thử lấy tenant_id từ g nếu đang trong request context
+    if tenant_id is None:
+        try:
+            from flask import g
+            if hasattr(g, 'tenant_id'):
+                tenant_id = g.tenant_id
+        except Exception:
+            pass
+
     # Khởi tạo và chạy background thread
     thread = threading.Thread(
         target=_send_email_async,
-        args=(app, recipient, subject, body),
+        args=(app, recipient, subject, body, is_html, tenant_id),
         name=f"EmailThread-{recipient}"
     )
     thread.daemon = True  # Đảm bảo thread tự chết khi main process dừng
@@ -84,41 +113,34 @@ def send_email(app, recipient: str, subject: str, body: str):
 
 
 # ── Templates mẫu cho module Leave ───────────────────────────────────────
+from app.services.email_templates import (
+    leave_submitted_html, leave_approved_html, 
+    leave_rejected_html, leave_cancelled_html
+)
 
 def send_leave_request_submitted_email(app, hr_email, employee_name, leave_type_name, start_date, end_date):
     """Email gửi cho HR khi nhân viên nộp đơn."""
     subject = "[GrapeHRM] Đơn nghỉ phép mới cần phê duyệt"
-    body = (
-        f"Xin chào HR,\n\n"
-        f"Nhân viên {employee_name} vừa nộp đơn xin nghỉ phép ({leave_type_name}) "
-        f"từ ngày {start_date} đến {end_date}.\n\n"
-        f"Vui lòng đăng nhập GrapeHRM để xem chi tiết và phê duyệt.\n\n"
-        f"Trân trọng,\nGrapeHRM System"
-    )
-    send_email(app, hr_email, subject, body)
+    body = leave_submitted_html(employee_name, leave_type_name, start_date, end_date)
+    send_email(app, hr_email, subject, body, is_html=True)
 
 
 def send_leave_final_approved_email(app, employee_email, leave_type_name, start_date, end_date):
     """Email gửi cho Nhân viên khi đơn được duyệt hoàn tất (HR approve)."""
     subject = "[GrapeHRM] Đơn nghỉ phép được duyệt hoàn tất ✅"
-    body = (
-        f"Xin chào,\n\n"
-        f"Đơn xin nghỉ phép ({leave_type_name}) của bạn "
-        f"từ ngày {start_date} đến {end_date} đã được phê duyệt thành công.\n\n"
-        f"Chúc bạn có thời gian nghỉ ngơi vui vẻ!\n\n"
-        f"Trân trọng,\nGrapeHRM System"
-    )
-    send_email(app, employee_email, subject, body)
+    body = leave_approved_html(leave_type_name, start_date, end_date)
+    send_email(app, employee_email, subject, body, is_html=True)
 
 
 def send_leave_rejected_email(app, employee_email, leave_type_name, reason):
     """Email gửi cho Nhân viên khi đơn bị từ chối (bởi HR)."""
     subject = "[GrapeHRM] Đơn nghỉ phép bị từ chối ❌"
-    body = (
-        f"Xin chào,\n\n"
-        f"Rất tiếc, đơn xin nghỉ phép ({leave_type_name}) của bạn đã bị từ chối.\n"
-        f"Lý do: {reason or 'Không có ghi chú'}\n\n"
-        f"Vui lòng liên hệ HR để biết thêm chi tiết.\n\n"
-        f"Trân trọng,\nGrapeHRM System"
-    )
-    send_email(app, employee_email, subject, body)
+    body = leave_rejected_html(leave_type_name, reason)
+    send_email(app, employee_email, subject, body, is_html=True)
+
+
+def send_leave_cancelled_email(app, hr_email, employee_name, leave_type_name, start_date, end_date):
+    """Email gửi cho HR khi nhân viên tự hủy đơn."""
+    subject = "[GrapeHRM] Đơn nghỉ phép đã bị hủy ⚠️"
+    body = leave_cancelled_html(employee_name, leave_type_name, start_date, end_date)
+    send_email(app, hr_email, subject, body, is_html=True)

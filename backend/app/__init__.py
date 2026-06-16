@@ -72,6 +72,9 @@ def create_app(config_name: str = None) -> Flask:
     app.register_blueprint(leave_balance_bp)
     app.register_blueprint(attendance_bp)
 
+    from app.admin import admin_bp
+    app.register_blueprint(admin_bp)
+
     # ── Route kiểm tra sức khỏe (health check) ──────────────────────
     @app.route("/api/health")
     def health():

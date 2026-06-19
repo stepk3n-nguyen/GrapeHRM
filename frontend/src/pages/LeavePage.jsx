@@ -86,15 +86,20 @@ const LeavePage = () => {
     fetchLeaveTypes();
   }, [activeTab, user?.employee_id]);
 
-  // Tự động tính số ngày nghỉ
+  // Tự động tính số ngày nghỉ (loại T7/CN — khớp với cách server tính)
   useEffect(() => {
     if (formData.start_date && formData.end_date) {
       const start = new Date(formData.start_date);
       const end = new Date(formData.end_date);
       if (end >= start) {
-        const diffTime = Math.abs(end - start);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        setFormData(prev => ({ ...prev, total_days: diffDays }));
+        let workdays = 0;
+        const cur = new Date(start);
+        while (cur <= end) {
+          const dow = cur.getDay(); // 0=CN, 6=T7
+          if (dow !== 0 && dow !== 6) workdays += 1;
+          cur.setDate(cur.getDate() + 1);
+        }
+        setFormData(prev => ({ ...prev, total_days: workdays }));
       } else {
         setFormData(prev => ({ ...prev, total_days: 0 }));
       }

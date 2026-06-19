@@ -98,6 +98,7 @@ def serialize_employee(emp):
         "gender": emp.gender,
         "marital_status": emp.marital_status,
         "birthday": emp.birthday.isoformat() if emp.birthday else None,
+        "num_dependents": emp.num_dependents or 0,
         "mobile": emp.mobile,
         "work_email": emp.work_email,
         "joined_date": emp.joined_date.isoformat() if emp.joined_date else None,
@@ -245,6 +246,11 @@ def create_employee():
         except ValueError:
             department_id = None
 
+    try:
+        num_dependents = int(data.get("num_dependents") or 0)
+    except (ValueError, TypeError):
+        num_dependents = 0
+
     new_emp = Employee(
         tenant_id=tenant_id,
         employee_id=employee_id,
@@ -262,6 +268,7 @@ def create_employee():
         profile_pic_url=profile_pic_url,
         title_id=title_id,
         department_id=department_id,
+        num_dependents=max(num_dependents, 0),
     )
 
     db.session.add(new_emp)
@@ -354,6 +361,11 @@ def update_employee(emp_id):
     else:
         emp.state = "ACTIVE"
 
+    if "num_dependents" in data:
+        try:
+            emp.num_dependents = max(int(data.get("num_dependents") or 0), 0)
+        except (ValueError, TypeError):
+            pass
     if "profile_pic_url" in data:
         emp.profile_pic_url = data.get("profile_pic_url", "").strip() or None
     if "title_id" in data:

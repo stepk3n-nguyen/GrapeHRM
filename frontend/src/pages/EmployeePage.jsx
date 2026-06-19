@@ -36,6 +36,7 @@ const EmployeePage = () => {
     gender: '1',
     marital_status: 'Single',
     birthday: '',
+    num_dependents: 0,
     mobile: '',
     work_email: '',
     joined_date: '',
@@ -145,6 +146,7 @@ const EmployeePage = () => {
       gender: '1',
       marital_status: 'Single',
       birthday: '',
+      num_dependents: 0,
       mobile: '',
       work_email: '',
       joined_date: new Date().toISOString().split('T')[0],
@@ -168,6 +170,7 @@ const EmployeePage = () => {
       gender: emp.gender !== null ? String(emp.gender) : '1',
       marital_status: emp.marital_status || 'Single',
       birthday: emp.birthday || '',
+      num_dependents: emp.num_dependents || 0,
       mobile: emp.mobile || '',
       work_email: emp.work_email || '',
       joined_date: emp.joined_date || '',
@@ -646,6 +649,17 @@ const EmployeePage = () => {
                       <option value="Married">Đã kết hôn</option>
                       <option value="Divorced">Đã ly hôn</option>
                     </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="num_dependents">Người phụ thuộc (giảm trừ thuế)</label>
+                    <input
+                      type="number"
+                      id="num_dependents"
+                      min="0"
+                      className="input"
+                      value={formData.num_dependents}
+                      onChange={(e) => setFormData({ ...formData, num_dependents: e.target.value })}
+                    />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="mobile">Số điện thoại</label>

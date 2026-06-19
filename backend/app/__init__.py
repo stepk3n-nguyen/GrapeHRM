@@ -64,16 +64,42 @@ def create_app(config_name: str = None) -> Flask:
 
     from app.leave.routes import (
         leave_type_bp, leave_policy_bp, leave_request_bp,
-        leave_balance_bp, attendance_bp
+        leave_balance_bp, attendance_bp, work_location_bp, work_shift_bp
     )
     app.register_blueprint(leave_type_bp)
     app.register_blueprint(leave_policy_bp)
     app.register_blueprint(leave_request_bp)
     app.register_blueprint(leave_balance_bp)
     app.register_blueprint(attendance_bp)
+    app.register_blueprint(work_location_bp)
+    app.register_blueprint(work_shift_bp)
 
     from app.admin import admin_bp
     app.register_blueprint(admin_bp)
+
+    from app.reports import reports_bp
+    app.register_blueprint(reports_bp)
+
+    from app.compensation import compensation_bp
+    app.register_blueprint(compensation_bp)
+
+    from app.tenant import tenant_bp
+    app.register_blueprint(tenant_bp)
+
+    from app.super_admin import super_admin_bp
+    app.register_blueprint(super_admin_bp)
+
+    from app.holiday import holiday_bp
+    app.register_blueprint(holiday_bp)
+
+    from app.contract import contract_bp
+    app.register_blueprint(contract_bp)
+
+    from app.recruitment import recruitment_bp
+    app.register_blueprint(recruitment_bp)
+
+    from app.performance import performance_bp
+    app.register_blueprint(performance_bp)
 
     # ── Route kiểm tra sức khỏe (health check) ──────────────────────
     @app.route("/api/health")

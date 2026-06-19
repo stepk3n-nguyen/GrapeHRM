@@ -12,31 +12,18 @@ import AttendancePage from './pages/AttendancePage';
 import LeavePolicyPage from './pages/LeavePolicyPage';
 import EmailSettingsPage from './pages/EmailSettingsPage';
 import ProfilePage from './pages/ProfilePage';
+import SettingsPage from './pages/SettingsPage';
+import WorkConfigPage from './pages/WorkConfigPage';
+import ReportsPage from './pages/ReportsPage';
+import SalaryConfigPage from './pages/SalaryConfigPage';
+import PayrollPage from './pages/PayrollPage';
+import MyPayslipPage from './pages/MyPayslipPage';
+import OvertimePage from './pages/OvertimePage';
+import ContractsPage from './pages/ContractsPage';
+import RecruitmentPage from './pages/RecruitmentPage';
+import PerformancePage from './pages/PerformancePage';
+import SuperAdminPage from './pages/SuperAdminPage';
 import { Loader2 } from 'lucide-react';
-
-// Thành phần Component Mock cho các trang chưa phát triển trong Phase này
-const MockPage = ({ title }) => (
-  <div className="fade-in">
-    <div className="breadcrumb">
-      <span>GrapeHRM</span>
-      <span>&gt;</span>
-      <span className="breadcrumb__item">{title}</span>
-    </div>
-    <div className="card">
-      <div className="card__header">
-        <h3 className="card__title">{title}</h3>
-      </div>
-      <div className="card__body" style={{ textAlign: 'center', padding: '48px 24px' }}>
-        <h4 style={{ fontWeight: 600, fontSize: '18px', color: 'var(--color-primary)', marginBottom: '8px' }}>
-          Phân hệ đang hoàn thiện
-        </h4>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', maxWidth: '500px', margin: '0 auto' }}>
-          Cảm ơn bạn đã quan tâm. Tính năng liên quan đến <strong>{title}</strong> đang trong quá trình lập trình tích hợp. Vui lòng trải nghiệm tính năng Quản lý nhân viên!
-        </p>
-      </div>
-    </div>
-  </div>
-);
 
 // Trình bảo vệ tuyến đường đăng nhập (Authentication Guard)
 const AppContent = () => {
@@ -94,6 +81,9 @@ const AppContent = () => {
                   <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/leave" element={<LeavePage />} />
                   <Route path="/attendance" element={<AttendancePage />} />
+                  <Route path="/overtime" element={<OvertimePage />} />
+                  <Route path="/performance" element={<PerformancePage />} />
+                  <Route path="/my-payslip" element={<MyPayslipPage />} />
                   <Route path="/" element={<Navigate to="/profile" replace />} />
                   <Route path="*" element={<Navigate to="/profile" replace />} />
                 </>
@@ -101,12 +91,21 @@ const AppContent = () => {
                 <>
                   <Route path="/" element={<DashboardPage />} />
                   <Route path="/employees" element={<EmployeePage />} />
-                  {user?.role !== 'admin' && <Route path="/profile" element={<ProfilePage />} />}
+                  <Route path="/profile" element={<ProfilePage />} />
                   <Route path="/leave" element={<LeavePage />} />
                   <Route path="/attendance" element={<AttendancePage />} />
+                  <Route path="/work-config" element={<WorkConfigPage />} />
+                  <Route path="/overtime" element={<OvertimePage />} />
+                  <Route path="/contracts" element={<ContractsPage />} />
+                  <Route path="/recruitment" element={<RecruitmentPage />} />
+                  <Route path="/performance" element={<PerformancePage />} />
+                  <Route path="/reports" element={<ReportsPage />} />
+                  <Route path="/salary-config" element={<SalaryConfigPage />} />
+                  <Route path="/payroll" element={<PayrollPage />} />
                   <Route path="/leave-policy" element={<LeavePolicyPage />} />
                   <Route path="/email-settings" element={<EmailSettingsPage />} />
-                  <Route path="/settings" element={<MockPage title="Hệ thống & Bảo mật (Settings)" />} />
+                  <Route path="/settings" element={<SettingsPage />} />
+                  {user?.role === 'super_admin' && <Route path="/super-admin" element={<SuperAdminPage />} />}
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </>
               )}

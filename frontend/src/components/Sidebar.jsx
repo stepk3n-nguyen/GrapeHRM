@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Clock, ClipboardList, Settings, Mail } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Clock, Clock4, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2, FileSignature, Briefcase, Target } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onCloseSidebar }) => {
@@ -10,12 +10,22 @@ const Sidebar = ({ isOpen, onCloseSidebar }) => {
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const menuItems = [
+    ...(user?.role === 'super_admin' ? [{ name: 'Quản lý Tổ chức', path: '/super-admin', icon: Building2 }] : []),
     ...(isAdminOrHR ? [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
-    ...(user?.role !== 'admin' ? [{ name: 'Thông tin cá nhân', path: '/profile', icon: Users }] : []),
+    { name: 'Thông tin cá nhân', path: '/profile', icon: Users },
     ...(isAdminOrHR ? [{ name: 'Quản lý nhân viên', path: '/employees', icon: Users }] : []),
+    ...(isAdminOrHR ? [{ name: 'Hợp đồng lao động', path: '/contracts', icon: FileSignature }] : []),
+    ...(isAdminOrHR ? [{ name: 'Tuyển dụng', path: '/recruitment', icon: Briefcase }] : []),
+    { name: 'Đánh giá hiệu suất', path: '/performance', icon: Target },
     { name: 'Nghỉ phép', path: '/leave', icon: CalendarDays },
     { name: 'Chấm công', path: '/attendance', icon: Clock },
+    { name: 'Tăng ca', path: '/overtime', icon: Clock4 },
+    ...(isAdminOrHR ? [{ name: 'Cấu hình chấm công', path: '/work-config', icon: MapPin }] : []),
     ...(isAdminOrHR ? [{ name: 'Chính sách phép', path: '/leave-policy', icon: ClipboardList }] : []),
+    ...(isAdminOrHR ? [{ name: 'Báo cáo', path: '/reports', icon: BarChart3 }] : []),
+    ...(isAdminOrHR ? [{ name: 'Cấu hình lương', path: '/salary-config', icon: Wallet }] : []),
+    ...(isAdminOrHR ? [{ name: 'Bảng lương', path: '/payroll', icon: Receipt }] : []),
+    ...(user?.role === 'employee' ? [{ name: 'Phiếu lương', path: '/my-payslip', icon: Receipt }] : []),
     ...(isAdmin ? [{ name: 'Cấu hình Email', path: '/email-settings', icon: Mail }] : []),
     ...(isAdmin ? [{ name: 'Hệ thống & Bảo mật', path: '/settings', icon: Settings }] : []),
   ];

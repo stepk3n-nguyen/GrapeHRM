@@ -16,13 +16,32 @@ def _send_email_async(app, recipient, subject, body, is_html=False, tenant_id=No
     Chạy trong context của app (để lấy config) nhưng ở thread riêng.
     """
     with app.app_context():
-        # Đọc cấu hình từ app.config
-        smtp_server = app.config.get("MAIL_SERVER")
-        smtp_port = app.config.get("MAIL_PORT")
-        use_tls = app.config.get("MAIL_USE_TLS", True)
-        username = app.config.get("MAIL_USERNAME")
-        password = app.config.get("MAIL_PASSWORD")
-        sender = app.config.get("MAIL_DEFAULT_SENDER")
+        smtp_server = smtp_port = use_tls = username = password = sender = None
+
+        # Ưu tiên SMTP riêng của tenant (nếu đã cấu hình)
+        if tenant_id is not None:
+            try:
+                from app.models.tenant_config import TenantConfig
+                from app.services.crypto_service import decrypt_secret
+                tc = TenantConfig.query.filter_by(tenant_id=tenant_id).first()
+                if tc and tc.mail_server:
+                    smtp_server = tc.mail_server
+                    smtp_port = tc.mail_port
+                    use_tls = tc.mail_use_tls
+                    username = tc.mail_username
+                    password = decrypt_secret(tc.mail_password_encrypted)
+                    sender = tc.mail_default_sender
+            except Exception:
+                smtp_server = None
+
+        # Fallback: cấu hình hệ thống trong app.config
+        if not smtp_server:
+            smtp_server = app.config.get("MAIL_SERVER")
+            smtp_port = app.config.get("MAIL_PORT")
+            use_tls = app.config.get("MAIL_USE_TLS", True)
+            username = app.config.get("MAIL_USERNAME")
+            password = app.config.get("MAIL_PASSWORD")
+            sender = app.config.get("MAIL_DEFAULT_SENDER")
 
         # Kiểm tra điều kiện cần
         if not all([smtp_server, smtp_port, username, password]):

@@ -20,5 +20,6 @@ __pycache__/
 backend/.venv/
 backend/test_*.py
 
-# Docs
-descriptions.mdproject.tar.gz
+# Build artifacts
+frontend/dist/
+*.tar.gz

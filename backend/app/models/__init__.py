@@ -11,11 +11,28 @@ from app.models.leave import (
     LeaveType, LeavePolicy, LeavePolicyDetail, EmployeeLeavePolicy,
     LeaveRequest, LeaveApprovalLog, Attendance
 )
+from app.models.work import WorkLocation, WorkShift
+from app.models.compensation import (
+    SalaryStructure, SalaryAllowance, SalaryDeduction, EmployeeSalary,
+    PayrollRun, Payslip, PayslipItem, OvertimeRequest
+)
+from app.models.audit_log import AuditLog
+from app.models.tenant_config import TenantConfig
 from app.models.email_log import EmailLog
+from app.models.holiday import Holiday
+from app.models.contract import Contract
+from app.models.recruitment import JobPosting, Candidate
+from app.models.performance import ReviewCycle, PerformanceReview, ReviewScore
 
 # Danh sách tất cả model — hỗ trợ Flask-Migrate phát hiện bảng tự động
 __all__ = [
     "Tenant", "User", "Employee", "EmployeeSequence", "JobTitle", "Department",
     "LeaveType", "LeavePolicy", "LeavePolicyDetail", "EmployeeLeavePolicy",
-    "LeaveRequest", "LeaveApprovalLog", "Attendance", "EmailLog"
+    "LeaveRequest", "LeaveApprovalLog", "Attendance",
+    "WorkLocation", "WorkShift",
+    "SalaryStructure", "SalaryAllowance", "SalaryDeduction", "EmployeeSalary",
+    "PayrollRun", "Payslip", "PayslipItem", "OvertimeRequest",
+    "AuditLog", "TenantConfig", "EmailLog", "Holiday",
+    "Contract", "JobPosting", "Candidate",
+    "ReviewCycle", "PerformanceReview", "ReviewScore",
 ]

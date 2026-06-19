@@ -29,6 +29,9 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
     marital_status = db.Column(db.String(20), nullable=True)
     birthday = db.Column(db.Date, nullable=True)
 
+    # Số người phụ thuộc — dùng tính giảm trừ gia cảnh khi tính thuế TNCN
+    num_dependents = db.Column(db.Integer, nullable=False, default=0)
+
     # ── Thông tin liên hệ ────────────────────────────────────────────
 
     mobile = db.Column(db.String(50), nullable=True)

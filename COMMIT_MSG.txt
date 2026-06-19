@@ -1,0 +1,30 @@
+feat: build full HRM system — multi-tenant, payroll, attendance, contracts, recruitment, performance
+
+Phase P1-P4 + Phase C (Payroll) + Phase D (HRM Modules):
+
+Backend:
+- Multi-tenant architecture: JWT with tenant_id, before_request middleware
+- Geofence check-in: Haversine formula, GPS validation per WorkLocation
+- Leave management: auto ON_LEAVE attendance sync on approve/reject
+- Per-tenant holiday calendar: seeded from VN state calendar, fully editable
+- Payroll: gross?net pipeline with OT pay (1.5x/2x/3x), insurance, progressive PIT (7 brackets)
+- Overtime requests: employee submit + HR approve/reject workflow
+- Contracts: PROBATION/FIXED_TERM/INDEFINITE/SEASONAL, 30-day expiry warning
+- Recruitment: JobPosting + Candidate pipeline (APPLIED?INTERVIEW?OFFERED?HIRED), hire?Employee
+- Performance: ReviewCycle + weighted criteria scores, overall_score auto-calculated
+- Reports: headcount, leave summary, monthly attendance stats
+- Audit logging, PDF payslips (reportlab), SMTP email with Fernet encryption
+- Super admin: multi-tenant management dashboard
+- seed_demo.py: 5 employees, 5 contracts, 3 candidates, 2 perf reviews, payroll T5/2026
+
+Frontend:
+- 11 new pages: Overtime, Contracts, Recruitment, Performance, Payroll, MyPayslip,
+  Reports, SalaryConfig, Settings, SuperAdmin, WorkConfig
+- Sidebar role-based menu (admin/hr_manager/employee)
+- Recharts dashboards, geolocation attendance, payslip detail modal
+
+DB:
+- Consolidated db/grapehrm_full.sql (portable mysqldump, --set-gtid-purged=OFF)
+- Removed scattered schema.sql / seed.sql / update_schema.sql
+
+Removed: Docker files, deploy scripts, legacy migration scripts

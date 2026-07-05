@@ -71,20 +71,16 @@ def parse_date(date_str):
         return None
 
 
-def serialize_employee(emp):
-    """Serialize đối tượng Employee thành dictionary JSON-friendly."""
-    # Tự động đồng bộ state nếu có end_date
+def effective_state(emp):
+    """Trạng thái thực tế suy từ end_date — KHÔNG ghi DB trong lúc đọc."""
     if emp.end_date:
         from datetime import date
-        today = date.today()
-        expected_state = "TERMINATED" if emp.end_date <= today else "ACTIVE"
-        if emp.state != expected_state:
-            emp.state = expected_state
-            db.session.commit()
-    elif emp.state != "ACTIVE":
-        emp.state = "ACTIVE"
-        db.session.commit()
+        return "TERMINATED" if emp.end_date <= date.today() else "ACTIVE"
+    return "ACTIVE"
 
+
+def serialize_employee(emp):
+    """Serialize đối tượng Employee thành dictionary JSON-friendly."""
     from app.models.user import User
     user_record = User.query.filter_by(employee_id=emp.id).first()
 
@@ -104,12 +100,14 @@ def serialize_employee(emp):
         "joined_date": emp.joined_date.isoformat() if emp.joined_date else None,
         "end_date": emp.end_date.isoformat() if emp.end_date else None,
         "address": emp.address,
-        "state": emp.state,
+        "state": effective_state(emp),
         "profile_pic_url": emp.profile_pic_url,
         "title_id": emp.title_id,
         "title_name": emp.title.name if emp.title else None,
         "department_id": emp.department_id,
         "department_name": emp.department.name if emp.department else None,
+        "shift_id": emp.shift_id,
+        "shift_name": emp.shift.name if emp.shift else None,
         "created_at": emp.created_at.isoformat() if emp.created_at else None,
         "updated_at": emp.updated_at.isoformat() if emp.updated_at else None,
         "role": user_record.role if user_record else None,
@@ -209,6 +207,10 @@ def create_employee():
     employee_id = data.get("employee_id", "").strip() or None
     if not employee_id:
         employee_id = generate_next_employee_id(tenant_id)
+    else:
+        # Chặn trùng mã nhân viên trong cùng tenant
+        if Employee.query.filter_by(tenant_id=tenant_id, employee_id=employee_id).first():
+            return jsonify({"error": f"Mã nhân viên {employee_id} đã tồn tại"}), 400
     gender = data.get("gender")
     if gender is not None:
         try:
@@ -220,6 +222,9 @@ def create_employee():
     birthday = parse_date(data.get("birthday"))
     mobile = data.get("mobile", "").strip() or None
     work_email = data.get("work_email", "").strip() or None
+    # Chặn trùng email công việc trong cùng tenant
+    if work_email and Employee.query.filter_by(tenant_id=tenant_id, work_email=work_email).first():
+        return jsonify({"error": f"Email {work_email} đã được dùng cho nhân viên khác"}), 400
     joined_date = parse_date(data.get("joined_date"))
     end_date = parse_date(data.get("end_date"))
     address = data.get("address", "").strip() or None
@@ -246,6 +251,13 @@ def create_employee():
         except ValueError:
             department_id = None
 
+    shift_id = data.get("shift_id")
+    if shift_id is not None:
+        try:
+            shift_id = int(shift_id) if shift_id else None
+        except ValueError:
+            shift_id = None
+
     try:
         num_dependents = int(data.get("num_dependents") or 0)
     except (ValueError, TypeError):
@@ -268,6 +280,7 @@ def create_employee():
         profile_pic_url=profile_pic_url,
         title_id=title_id,
         department_id=department_id,
+        shift_id=shift_id,
         num_dependents=max(num_dependents, 0),
     )
 
@@ -278,7 +291,12 @@ def create_employee():
     role = data.get("role", "employee")
     from app.models.user import User
     username = new_emp.employee_id.replace("-", "").lower() if new_emp.employee_id else f"nv{new_emp.id}"
-    
+
+    # Chặn trùng username (vd: mã NV nhập tay trùng dạng chuẩn hóa)
+    if User.query.filter_by(tenant_id=tenant_id, username=username).first():
+        db.session.rollback()
+        return jsonify({"error": f"Tài khoản đăng nhập '{username}' đã tồn tại — hãy dùng mã nhân viên khác"}), 400
+
     new_user = User(
         tenant_id=tenant_id,
         employee_id=new_emp.id,
@@ -335,7 +353,12 @@ def update_employee(emp_id):
 
     # Cập nhật các trường còn lại nếu có truyền lên
     if "employee_id" in data:
-        emp.employee_id = data.get("employee_id", "").strip() or None
+        new_code = data.get("employee_id", "").strip() or None
+        if new_code and new_code != emp.employee_id:
+            dup = Employee.query.filter_by(tenant_id=tenant_id, employee_id=new_code).filter(Employee.id != emp.id).first()
+            if dup:
+                return jsonify({"error": f"Mã nhân viên {new_code} đã tồn tại"}), 400
+        emp.employee_id = new_code
     if "gender" in data:
         gender = data.get("gender")
         emp.gender = int(gender) if gender is not None else None
@@ -346,7 +369,12 @@ def update_employee(emp_id):
     if "mobile" in data:
         emp.mobile = data.get("mobile", "").strip() or None
     if "work_email" in data:
-        emp.work_email = data.get("work_email", "").strip() or None
+        new_email = data.get("work_email", "").strip() or None
+        if new_email and new_email != emp.work_email:
+            dup = Employee.query.filter_by(tenant_id=tenant_id, work_email=new_email).filter(Employee.id != emp.id).first()
+            if dup:
+                return jsonify({"error": f"Email {new_email} đã được dùng cho nhân viên khác"}), 400
+        emp.work_email = new_email
     if "joined_date" in data:
         emp.joined_date = parse_date(data.get("joined_date"))
     if "end_date" in data:
@@ -378,6 +406,12 @@ def update_employee(emp_id):
         d_id = data.get("department_id")
         try:
             emp.department_id = int(d_id) if d_id else None
+        except ValueError:
+            pass
+    if "shift_id" in data:
+        s_id = data.get("shift_id")
+        try:
+            emp.shift_id = int(s_id) if s_id else None
         except ValueError:
             pass
 
@@ -414,14 +448,39 @@ def update_employee(emp_id):
 @employee_bp.route("/<int:emp_id>", methods=["DELETE"])
 @jwt_required()
 def delete_employee(emp_id):
-    """Xóa nhân viên khỏi hệ thống (phải thuộc tenant)."""
+    """Xóa nhân viên — CHỈ khi chưa có dữ liệu lương/chấm công.
+
+    Nhân viên đã có phiếu lương hoặc lịch sử chấm công thì không được xóa
+    (mất dấu vết pháp lý) — hãy đặt ngày nghỉ việc (end_date) để chuyển
+    sang trạng thái TERMINATED thay vì xóa.
+    """
+    if not check_hr_admin():
+        return jsonify({"error": "Không có quyền truy cập"}), 403
+
     tenant_id = g.tenant_id
     emp = Employee.query.filter_by(id=emp_id, tenant_id=tenant_id).first()
 
     if not emp:
         return jsonify({"error": "Không tìm thấy hồ sơ nhân viên"}), 404
 
-    # Thực hiện hard delete record nhân sự
+    from app.models.compensation import Payslip
+    from app.models.attendance import Attendance
+    has_payslip = Payslip.query.filter_by(employee_id=emp.id).count() > 0
+    has_attendance = Attendance.query.filter_by(employee_id=emp.id).count() > 0
+    force = request.args.get("force") == "1"
+
+    if (has_payslip or has_attendance) and not force:
+        return jsonify({
+            "error": "Nhân viên đã có dữ liệu chấm công/lương — không nên xóa. "
+                     "Hãy đặt ngày nghỉ việc để chuyển sang 'Đã nghỉ', "
+                     "hoặc gọi lại với ?force=1 nếu chắc chắn muốn xóa toàn bộ lịch sử.",
+            "has_payslip": has_payslip,
+            "has_attendance": has_attendance,
+        }), 409
+
+    # Xóa user đăng nhập gắn kèm để không để lại tài khoản mồ côi
+    from app.models.user import User
+    User.query.filter_by(employee_id=emp.id).delete()
     db.session.delete(emp)
     db.session.commit()
 

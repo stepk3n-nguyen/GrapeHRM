@@ -66,6 +66,15 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
         nullable=True,
     )
 
+    # Ca làm việc được gán cho nhân viên — nếu NULL dùng ca mặc định của công ty.
+    # Cho phép mỗi nhân viên một ca khác nhau (hỗ trợ nhiều ca thực sự).
+    shift_id = db.Column(
+        db.Integer,
+        db.ForeignKey("work_shifts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    shift = db.relationship("WorkShift", foreign_keys=[shift_id])
+
     # ── Quan hệ với User (1 Employee ↔ 1 User account) ──────────────
 
     user = db.relationship("User", backref="employee", uselist=False,

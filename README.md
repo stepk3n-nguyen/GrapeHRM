@@ -13,12 +13,13 @@ chấm công bằng GPS/geofence, nghỉ phép, tính lương và phiếu lươn
 |------|-----------|
 | **Xác thực & phân quyền** | JWT, 4 vai trò: Super Admin / Admin / HR Manager / Nhân viên. Đăng nhập theo mã tổ chức. |
 | **Nhân sự** | Hồ sơ nhân viên, phòng ban, chức vụ, tài khoản đăng nhập. |
-| **Chấm công (geofence)** | Nhân viên tự check-in/out bằng GPS trình duyệt; kiểm tra vị trí trong bán kính công ty (Haversine); tự nhận diện đi muộn theo ca làm. |
-| **Nghỉ phép** | Đơn nghỉ, duyệt nhiều cấp, quỹ phép theo chính sách, chống trùng/vượt quỹ; tự sinh chấm công ON_LEAVE khi duyệt. |
+| **Chấm công (geofence)** | Nhân viên tự check-in/out bằng GPS trình duyệt; kiểm tra vị trí trong bán kính công ty (Haversine); tự nhận diện **đi muộn / về sớm / nửa công** theo ca làm của TỪNG nhân viên (nhiều ca, gán ca riêng). |
+| **Tổng công tháng** | Tự động tính từ dữ liệu chấm công + nghỉ phép + tăng ca (không nhập tay): ngày đủ công, nửa công, thiếu chấm ra, đi muộn, phép, nghỉ không lương, vắng không phép, giờ OT, TỔNG CÔNG. Xuất CSV mở bằng Excel. |
+| **Nghỉ phép** | Đơn nghỉ → HR duyệt, quỹ phép theo chính sách, chống trùng/vượt quỹ; duyệt xong TỰ SINH chấm công ON_LEAVE (từ chối thì tự gỡ) — một nguồn dữ liệu duy nhất, không nhập 2 nơi. |
 | **Lịch ngày lễ** | Lịch nghỉ lễ **riêng từng công ty**; loại khỏi ngày công chuẩn (lương) và quỹ phép. |
 | **Tăng ca (OT)** | Nhân viên đăng ký tăng ca → HR duyệt → tự cộng tiền OT vào lương theo hệ số luật LĐ (thường 150%, cuối tuần 200%, lễ 300%). |
 | **Tiền lương** | Cấu trúc lương, phụ cấp/khấu trừ, **thuế TNCN lũy tiến + giảm trừ gia cảnh**, lương gross→net, chạy bảng lương theo ngày công thực tế, phiếu lương PDF. |
-| **Báo cáo** | Dashboard + báo cáo nhân sự/nghỉ phép/chấm công với biểu đồ, xuất CSV. |
+| **Báo cáo** | Dashboard xoay quanh chấm công: hôm nay ai đi làm / đi muộn / nghỉ phép / vắng, tỷ lệ đi làm, tổng công + OT tháng hiện tại; báo cáo nhân sự/nghỉ phép/chấm công với biểu đồ, xuất CSV. |
 | **Quản trị** | Nhật ký kiểm toán (audit log), cấu hình SMTP per-tenant (mã hóa Fernet), Super Admin quản lý tổ chức. |
 
 ---
@@ -61,7 +62,8 @@ GrapeHRM/
 ├── frontend/
 │   └── src/pages/             # các trang React (Dashboard, Attendance, Leave, Payroll, WorkConfig...)
 ├── db/
-│   └── grapehrm_full.sql      # FILE SQL DUY NHẤT: schema + dữ liệu demo (restore 1 lệnh)
+│   ├── grapehrm_full.sql      # FILE SQL DUY NHẤT: schema + dữ liệu demo (restore 1 lệnh)
+│   └── migration_2026_07_attendance_refactor.sql  # Migration tham khảo cho DB cũ
 ├── README.md
 └── HUONG_DAN_SU_DUNG.md       # hướng dẫn sử dụng & kịch bản test chi tiết
 ```
@@ -74,7 +76,10 @@ GrapeHRM/
 
 ```bash
 # 1) Cơ sở dữ liệu — cách A: nạp sẵn dữ liệu demo (khuyến nghị để xem ngay)
+# Nạp schema + dữ liệu demo bằng 1 lệnh (mật khẩu root MySQL của bạn):
 mysql -u root -p < db/grapehrm_full.sql
+
+# (Cách khác: tạo DB trống — schema tự tạo khi chạy backend, demo: python seed_demo.py)
 #    cách B: bắt đầu trắng cho công ty thật
 #    mysql -u root -p -e "CREATE DATABASE grapehrm CHARACTER SET utf8mb4;"
 

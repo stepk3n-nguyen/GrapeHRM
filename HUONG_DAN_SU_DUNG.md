@@ -61,6 +61,8 @@ Mở trình duyệt vào **http://localhost:5173**.
 - **Địa điểm làm việc** → "Thêm địa điểm" → bấm **"Lấy vị trí hiện tại"** ngay tại văn phòng để
   lấy đúng toạ độ → đặt bán kính (vd 300m). Nhân viên chỉ chấm công được khi đứng trong vùng này.
 - **Ca làm việc** → giờ vào/ra, ngưỡng đi muộn (vd 8:30–17:30, trễ tối đa 15 phút). Đặt 1 ca **mặc định**.
+  Có thể tạo nhiều ca (vd Ca sớm 7:00–16:00) và **gán ca riêng cho từng nhân viên** trong form
+  hồ sơ nhân viên — hệ thống tính đi muộn / về sớm / nửa công theo đúng ca của người đó.
 - **Ngày lễ** → lịch nghỉ lễ là **của riêng công ty bạn**. Khi tạo công ty mới, hệ thống nạp
   sẵn lịch nhà nước năm hiện tại làm điểm xuất phát — bạn có thể giữ nguyên, **thêm** ngày nghỉ
   riêng (vd ngày thành lập công ty), **bớt** ngày không nghỉ, hoặc **xóa hết** nếu không áp dụng.
@@ -128,6 +130,12 @@ khấu trừ −, thực lĩnh) → **Tải PDF**. *Chỉ xem được khi HR đ
 - Khi duyệt: hệ thống **tự tạo bản ghi chấm công ON_LEAVE** cho các ngày nghỉ (bỏ T7/CN + lễ),
   và gửi email thông báo cho nhân viên.
 - Khi từ chối đơn đã duyệt: tự gỡ các ngày ON_LEAVE đã tạo.
+
+### C1b. Tổng công tháng (mới)
+**Menu: Chấm công → tab "Tổng công tháng"** — bảng công tự động tính từ dữ liệu chấm công +
+nghỉ phép + tăng ca, **không nhập tay**: ngày đủ công, nửa công, thiếu chấm ra (⚠ cần HR bổ sung
+giờ ra), số lần đi muộn (kèm tổng phút), phép có lương / không lương, vắng không phép, giờ OT và
+**TỔNG CÔNG**. Bấm **Xuất CSV** để mở bằng Excel. Số liệu này chính là số liệu bảng lương sử dụng.
 
 ### C2. Báo cáo
 **Menu: Báo cáo** (3 tab có biểu đồ): Nhân sự (theo phòng ban, giới tính, độ tuổi),
@@ -207,7 +215,7 @@ Dùng dữ liệu mẫu có sẵn để kiểm chứng từng luồng. ✅ = k�
 
 **Lệnh nhanh**
 ```bash
-mysql -u root -p < db/grapehrm_full.sql   # nạp lại dữ liệu mẫu bất cứ lúc nào
+mysql -u root -p < db/grapehrm_full.sql   # nạp lại schema + dữ liệu mẫu bất cứ lúc nào
 cd backend && python run.py                # backend  :5000
 cd frontend && npm run dev                 # frontend :5173
 cd backend && python test_full_flow.py     # tự test 43+ API (backend phải đang chạy)

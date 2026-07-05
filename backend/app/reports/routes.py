@@ -13,8 +13,10 @@ from sqlalchemy import extract
 
 from app.extensions import db
 from app.models.employee import Employee, Department
-from app.models.leave import LeaveRequest, LeaveType, Attendance
+from app.models.leave import LeaveRequest, LeaveType
+from app.models.attendance import Attendance
 from app.models.user import User
+from app.services import attendance_service as att_svc
 from . import reports_bp
 
 
@@ -54,14 +56,16 @@ def dashboard_stats():
 
     pending = LeaveRequest.query.filter_by(tenant_id=tid, status="PENDING_HR").count()
 
-    # Tỷ lệ chấm công tháng hiện tại
-    att = Attendance.query.filter(
-        Attendance.tenant_id == tid,
-        extract("month", Attendance.date) == today.month,
-        extract("year", Attendance.date) == today.year,
-    ).all()
-    present_like = sum(1 for a in att if a.status in ("PRESENT", "LATE"))
-    rate = round(present_like / len(att) * 100, 1) if att else 0
+    # ── HÔM NAY: đi làm / đi muộn / nghỉ phép / vắng (tính từ chấm công) ──
+    today_block = att_svc.today_stats(tid, today)
+
+    # ── THÁNG NÀY: tổng công toàn công ty (tính động từ log) ─────────────
+    month_rows = att_svc.monthly_summary(tid, today.year, today.month)
+    month_total_workdays = round(sum(r["total_workdays"] for r in month_rows), 1)
+    month_late_count = sum(r["late_count"] for r in month_rows)
+    month_absent_days = sum(r["absent_days"] for r in month_rows)
+    month_ot_hours = round(sum(r["ot_hours"] for r in month_rows), 1)
+    month_standard = month_rows[0]["standard_days"] if month_rows else 0
 
     # Theo phòng ban
     dept_map = {d.id: d.name for d in Department.query.filter_by(tenant_id=tid).all()}
@@ -78,7 +82,18 @@ def dashboard_stats():
         "terminated_employees": terminated,
         "new_hires_this_month": new_hires,
         "pending_leave_requests": pending,
-        "attendance_rate_this_month": rate,
+        "today": today_block,
+        "month": {
+            "month": today.month,
+            "year": today.year,
+            "standard_days": month_standard,
+            "total_workdays": month_total_workdays,
+            "late_count": month_late_count,
+            "absent_days": month_absent_days,
+            "ot_hours": month_ot_hours,
+        },
+        # Giữ khóa cũ để tương thích: tỷ lệ đi làm HÔM NAY
+        "attendance_rate_this_month": today_block["attendance_rate"],
         "departments_summary": [{"name": k, "count": v} for k, v in sorted(dept_count.items(), key=lambda x: -x[1])],
     }), 200
 
@@ -206,7 +221,9 @@ def report_attendance():
         extract("month", Attendance.date) == month,
     ).all()
 
-    summary = {"total_records": len(records), "present": 0, "absent": 0, "late": 0, "on_leave": 0}
+    PRESENT_LIKE = ("PRESENT", "LATE", "EARLY_LEAVE", "HALF_DAY")
+    summary = {"total_records": len(records), "present": 0, "absent": 0, "late": 0,
+               "early_leave": 0, "half_day": 0, "on_leave": 0}
     by_emp = {}
     daily = {}
     for r in records:
@@ -216,12 +233,16 @@ def report_attendance():
             summary["absent"] += 1
         elif r.status == "LATE":
             summary["late"] += 1
+        elif r.status == "EARLY_LEAVE":
+            summary["early_leave"] += 1
+        elif r.status == "HALF_DAY":
+            summary["half_day"] += 1
         elif r.status == "ON_LEAVE":
             summary["on_leave"] += 1
 
         name = r.employee.full_name() if r.employee else "?"
         e = by_emp.setdefault(name, {"present": 0, "absent": 0, "late": 0, "hours": []})
-        if r.status in ("PRESENT", "LATE"):
+        if r.status in PRESENT_LIKE:
             e["present"] += 1
             if r.status == "LATE":
                 e["late"] += 1
@@ -232,7 +253,7 @@ def report_attendance():
 
         ds = r.date.isoformat()
         dd = daily.setdefault(ds, {"date": ds, "present": 0, "absent": 0, "late": 0})
-        if r.status in ("PRESENT", "LATE"):
+        if r.status in PRESENT_LIKE:
             dd["present"] += 1
             if r.status == "LATE":
                 dd["late"] += 1

@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Users, UserCheck, CalendarRange, Activity, ArrowRight, BarChart3 } from 'lucide-react';
+import {
+  Users, UserCheck, UserX, CalendarRange, Activity, AlarmClock,
+  ArrowRight, BarChart3, CalendarCheck2,
+} from 'lucide-react';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
+// Dashboard xoay quanh CHẤM CÔNG: hôm nay ai đi làm / muộn / nghỉ / vắng
+// và tổng công tháng hiện tại (tính động từ dữ liệu chấm công).
 const DashboardPage = () => {
   const { user, getAuthHeaders } = useAuth();
   const [stats, setStats] = useState(null);
@@ -18,16 +23,28 @@ const DashboardPage = () => {
     fetchStats();
   }, []);
 
-  const v = (n) => (stats ? String(n) : '...');
-  const widgets = [
-    { label: 'Tổng nhân viên', value: v(stats?.total_employees), icon: Users, variant: 'primary' },
-    { label: 'Đang làm việc', value: v(stats?.active_employees), icon: UserCheck, variant: 'accent' },
-    { label: 'Đơn phép chờ duyệt', value: v(stats?.pending_leave_requests), icon: CalendarRange, variant: 'success' },
-    { label: 'Tỷ lệ chấm công', value: stats ? `${stats.attendance_rate_this_month}%` : '...', icon: Activity, variant: 'primary' },
+  const today = stats?.today || {};
+  const month = stats?.month || {};
+  const v = (n) => (stats ? String(n ?? 0) : '...');
+
+  // Hàng 1 — HÔM NAY (nguồn: chấm công)
+  const todayWidgets = [
+    { label: 'Đi làm hôm nay', value: v(today.present), icon: UserCheck, variant: 'success' },
+    { label: 'Đi muộn hôm nay', value: v(today.late), icon: AlarmClock, variant: 'primary' },
+    { label: 'Nghỉ phép hôm nay', value: v(today.on_leave), icon: CalendarRange, variant: 'accent' },
+    { label: today.is_working_day === false ? 'Hôm nay nghỉ' : 'Vắng / chưa chấm', value: v(today.absent), icon: UserX, variant: 'primary' },
   ];
 
-  const rate = stats?.attendance_rate_this_month || 0;
-  const rateData = [{ name: 'Có mặt', value: rate }, { name: 'Còn lại', value: Math.max(100 - rate, 0) }];
+  // Hàng 2 — nhân sự & tháng này
+  const monthWidgets = [
+    { label: 'Nhân viên đang làm', value: v(stats?.active_employees), icon: Users, variant: 'primary' },
+    { label: `Tổng công T${month.month || ''}`, value: stats ? `${month.total_workdays ?? 0}` : '...', icon: CalendarCheck2, variant: 'success' },
+    { label: 'Đơn phép chờ duyệt', value: v(stats?.pending_leave_requests), icon: CalendarRange, variant: 'accent' },
+    { label: 'Giờ OT tháng này', value: stats ? `${month.ot_hours ?? 0}h` : '...', icon: Activity, variant: 'primary' },
+  ];
+
+  const rate = today.attendance_rate || 0;
+  const rateData = [{ name: 'Đi làm', value: rate }, { name: 'Còn lại', value: Math.max(100 - rate, 0) }];
 
   return (
     <div className="fade-in">
@@ -35,11 +52,28 @@ const DashboardPage = () => {
 
       <div style={{ marginBottom: '24px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Xin chào, {user ? user.username : 'HR Manager'}!</h2>
-        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>Tổng quan nguồn lực doanh nghiệp của bạn hôm nay.</p>
+        <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>
+          Tình hình chấm công hôm nay {today.date ? `(${new Date(today.date).toLocaleDateString('vi-VN')})` : ''} và tổng công tháng hiện tại.
+        </p>
       </div>
 
       <div className="dashboard-grid">
-        {widgets.map((w, idx) => {
+        {todayWidgets.map((w, idx) => {
+          const Icon = w.icon;
+          return (
+            <div className="widget" key={idx}>
+              <div className="widget__info">
+                <span className="widget__label">{w.label}</span>
+                <span className="widget__value">{w.value}</span>
+              </div>
+              <div className={`widget__icon-wrapper widget__icon-wrapper--${w.variant}`}><Icon size={24} /></div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="dashboard-grid" style={{ marginTop: '16px' }}>
+        {monthWidgets.map((w, idx) => {
           const Icon = w.icon;
           return (
             <div className="widget" key={idx}>
@@ -70,7 +104,10 @@ const DashboardPage = () => {
         </div>
 
         <div className="card card--no-hover">
-          <div className="card__header"><h3 className="card__title"><Activity size={18} /><span>Tỷ lệ chấm công tháng này</span></h3></div>
+          <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card__title"><Activity size={18} /><span>Tỷ lệ đi làm hôm nay</span></h3>
+            <Link to="/attendance" className="btn btn--secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>Bảng chấm công <ArrowRight size={12} /></Link>
+          </div>
           <div className="card__body" style={{ height: 260, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -82,7 +119,9 @@ const DashboardPage = () => {
             </ResponsiveContainer>
             <div style={{ marginTop: '-150px', textAlign: 'center', pointerEvents: 'none' }}>
               <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-success)' }}>{rate}%</div>
-              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>có mặt</div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                {today.present ?? 0}/{today.total_active_employees ?? 0} nhân viên
+              </div>
             </div>
           </div>
         </div>

@@ -19,11 +19,11 @@ thống quản lý nhân sự đa tổ chức GrapeHRM.
 | **P4** | Audit log, Super Admin, SMTP per-tenant, đăng ký tổ chức | ✅ Xong |
 | **Phase B** | Lịch ngày lễ theo từng công ty | ✅ Xong |
 | **Phase C** | Chiều sâu lương: Thuế TNCN + Tăng ca | ✅ Xong |
-| **Phase D** | Module HRM: Hợp đồng → Tuyển dụng → Đánh giá hiệu suất | ⏳ Tiếp theo |
+| **Phase D** | Refactor xoay quanh Attendance: tổng công tháng tự tính, ca theo nhân viên, về sớm/nửa công tự nhận diện, dashboard chấm công | ✅ Xong |
 | **Phase E** | Trợ lý HR AI (Claude) | ⏳ Kế hoạch |
 
 > Kiểm thử: `backend/test_full_flow.py` — **50+ test API end-to-end, tất cả PASS**.
-> Dữ liệu demo: `db/grapehrm_full.sql` (restore 1 lệnh: `mysql -u root -p < db/grapehrm_full.sql`).
+> Dữ liệu demo: `db/grapehrm_full.sql` (restore 1 lệnh: `mysql -u root -p < db/grapehrm_full.sql`) hoặc `backend/seed_demo.py`.
 
 ---
 
@@ -73,12 +73,16 @@ thống quản lý nhân sự đa tổ chức GrapeHRM.
 
 ## C. LỘ TRÌNH TIẾP THEO
 
-### Phase D — Mở rộng module HRM *(đang chuẩn bị)*
-Bổ sung các phân hệ mà HRM thương mại nào cũng có, tăng chiều rộng hệ thống:
+### Đã LOẠI khỏi MVP (quyết định 07/2026)
+Ba module dưới đây từng được xây ở mức demo nhưng **không đủ dữ liệu để vận hành thực tế**
+với doanh nghiệp vừa và nhỏ tại VN, nên đã gỡ toàn bộ (code + bảng DB) để giữ sản phẩm gọn:
 
-1. **Hợp đồng lao động** — loại HĐ (thử việc / xác định / không xác định thời hạn), ngày bắt đầu–kết thúc, lương theo HĐ, **cảnh báo sắp hết hạn** để gia hạn.
-2. **Tuyển dụng** — tin tuyển dụng, hồ sơ ứng viên, luồng phỏng vấn (Nộp → Phỏng vấn → Nhận/Loại), chuyển ứng viên trúng tuyển thành nhân viên.
-3. **Đánh giá hiệu suất (KPI)** — kỳ đánh giá, tiêu chí, chấm điểm, kết quả theo nhân viên/phòng ban.
+1. **Hợp đồng lao động** — không có mẫu HĐ, không sinh PDF, không đính kèm file, không version,
+   không ký số → chỉ là bảng ghi ngày tháng, HR vẫn phải quản lý HĐ giấy song song.
+2. **Tuyển dụng** — không upload CV, không lịch phỏng vấn; SME VN tuyển qua Zalo/email là chính.
+3. **Đánh giá hiệu suất** — tiêu chí gõ tay tự do, không mục tiêu/kỳ chuẩn → không tạo giá trị.
+
+Khi nào cần, xây lại từng module ở mức dùng được thật (HĐ: mẫu + PDF + lưu file ký scan).
 
 ### Phase E — Trợ lý HR AI (Claude) *(điểm nhấn công nghệ — làm cuối)*
 - Chatbot dùng **Claude API** trả lời nhân viên/HR bằng tiếng Việt: "Tôi còn bao nhiêu ngày phép?", "Chính sách nghỉ thai sản thế nào?", "Lương tháng này tính ra sao?".
@@ -104,7 +108,7 @@ GrapeHRM/
 │   ├── seed_demo.py       # tạo dữ liệu demo (5 NV, chấm công, OT, lương)
 │   └── test_full_flow.py  # 50+ test API end-to-end
 ├── frontend/src/pages/    # các trang React
-├── db/grapehrm_full.sql   # FILE SQL DUY NHẤT (schema + demo, restore 1 lệnh)
+├── db/grapehrm_full.sql   # schema + demo (restore 1 lệnh); kèm migration tham khảo
 ├── README.md              # giới thiệu & cài đặt
 ├── HUONG_DAN_SU_DUNG.md   # hướng dẫn dùng & kịch bản test theo vai trò
 └── TIEN_DO_DU_AN.md       # (file này) tiến độ & lộ trình

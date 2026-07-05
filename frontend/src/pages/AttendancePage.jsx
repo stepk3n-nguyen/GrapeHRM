@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Download, Plus, Loader2, CheckCircle, MapPin, LogIn, LogOut,
-  Pencil, Trash2, ShieldCheck, AlertTriangle
+  Pencil, Trash2, ShieldCheck, AlertTriangle, Table2, ListChecks
 } from 'lucide-react';
 
 const getCurrentPosition = () =>
@@ -16,8 +16,9 @@ const getCurrentPosition = () =>
   });
 
 const STATUS_OPTS = [
-  ['PRESENT', 'Có mặt'], ['ABSENT', 'Vắng mặt'], ['LATE', 'Đi muộn'],
-  ['HALF_DAY', 'Nửa ngày'], ['ON_LEAVE', 'Nghỉ phép'],
+  ['', 'Tự xác định theo ca'], ['PRESENT', 'Có mặt'], ['ABSENT', 'Vắng mặt'],
+  ['LATE', 'Đi muộn'], ['EARLY_LEAVE', 'Về sớm'], ['HALF_DAY', 'Nửa ngày'],
+  ['ON_LEAVE', 'Nghỉ phép'],
 ];
 
 const AttendancePage = () => {
@@ -27,12 +28,14 @@ const AttendancePage = () => {
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [employees, setEmployees] = useState([]);
+  const [view, setView] = useState('log'); // 'log' | 'summary'
+  const [summary, setSummary] = useState([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     employee_id: '', date: new Date().toISOString().split('T')[0],
-    check_in: '08:30', check_out: '17:30', status: 'PRESENT', note: ''
+    check_in: '08:30', check_out: '17:30', status: '', note: ''
   });
 
   // ── Tự chấm công ──────────────────────────────────────────────
@@ -70,6 +73,15 @@ const AttendancePage = () => {
     } catch (err) { console.error(err); }
   };
 
+  const fetchSummary = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/attendance/summary?month=${month}&year=${year}`, { headers: getAuthHeaders() });
+      if (res.ok) setSummary((await res.json()).rows || []);
+    } catch (err) { console.error(err); }
+    finally { setLoading(false); }
+  };
+
   const fetchToday = async () => {
     if (!canSelfPunch) return;
     try {
@@ -82,7 +94,11 @@ const AttendancePage = () => {
     } catch (err) { console.error(err); }
   };
 
-  useEffect(() => { fetchAttendance(); fetchEmployees(); /* eslint-disable-next-line */ }, [month, year]);
+  useEffect(() => {
+    if (view === 'summary') fetchSummary(); else fetchAttendance();
+    fetchEmployees();
+    /* eslint-disable-next-line */
+  }, [month, year, view]);
   useEffect(() => { fetchToday(); /* eslint-disable-next-line */ }, []);
 
   const punch = async (kind) => {
@@ -107,6 +123,19 @@ const AttendancePage = () => {
     }
   };
 
+  const handleExportSummary = async () => {
+    try {
+      const response = await fetch(`/api/attendance/summary/export?month=${month}&year=${year}`, { headers: getAuthHeaders() });
+      if (response.ok) {
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = `tong_cong_${month}_${year}.csv`;
+        document.body.appendChild(a); a.click(); window.URL.revokeObjectURL(url);
+      }
+    } catch (err) { showToast('Lỗi khi tải file', 'error'); }
+  };
+
   const handleExport = async () => {
     try {
       const response = await fetch(`/api/attendance/export?month=${month}&year=${year}`, { headers: getAuthHeaders() });
@@ -122,7 +151,7 @@ const AttendancePage = () => {
 
   const openCreate = () => {
     setEditingId(null);
-    setFormData({ employee_id: '', date: new Date().toISOString().split('T')[0], check_in: '08:30', check_out: '17:30', status: 'PRESENT', note: '' });
+    setFormData({ employee_id: '', date: new Date().toISOString().split('T')[0], check_in: '08:30', check_out: '17:30', status: '', note: '' });
     setIsModalOpen(true);
   };
 
@@ -141,7 +170,7 @@ const AttendancePage = () => {
       if (response.ok) {
         showToast(editingId ? 'Đã cập nhật chấm công' : 'Đã thêm chấm công thủ công');
         setIsModalOpen(false);
-        fetchAttendance();
+        if (view === 'summary') fetchSummary(); else fetchAttendance();
       } else {
         showToast(d.error || 'Lỗi', 'error');
       }
@@ -163,6 +192,7 @@ const AttendancePage = () => {
       case 'PRESENT': return <span className="status-badge status-badge--approved">Có mặt</span>;
       case 'ABSENT': return <span className="status-badge status-badge--rejected">Vắng mặt</span>;
       case 'LATE': return <span className="status-badge status-badge--warning">Đi muộn</span>;
+      case 'EARLY_LEAVE': return <span className="status-badge status-badge--warning">Về sớm</span>;
       case 'HALF_DAY': return <span className="status-badge status-badge--pending-hr">Nửa ngày</span>;
       case 'ON_LEAVE': return <span className="status-badge status-badge--cancelled">Nghỉ phép</span>;
       default: return <span className="status-badge">{status}</span>;
@@ -246,14 +276,24 @@ const AttendancePage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>
-            {isAdminOrHR ? 'Bảng chấm công' : 'Lịch sử chấm công'}
+            {view === 'summary' ? 'Tổng công tháng' : (isAdminOrHR ? 'Bảng chấm công' : 'Lịch sử chấm công')}
           </h2>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '4px' }}>
-            Xem thời gian làm việc, xuất báo cáo chấm công hàng tháng.
+            {view === 'summary'
+              ? 'Tự động tính từ dữ liệu chấm công + nghỉ phép + tăng ca — không nhập tay.'
+              : 'Xem thời gian làm việc, xuất báo cáo chấm công hàng tháng.'}
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', border: '1px solid var(--color-border, #dee2e6)', borderRadius: '6px', overflow: 'hidden' }}>
+            <button className={`btn ${view === 'log' ? 'btn--primary' : 'btn--secondary'}`} style={{ borderRadius: 0 }} onClick={() => setView('log')}>
+              <ListChecks size={15} /> Nhật ký
+            </button>
+            <button className={`btn ${view === 'summary' ? 'btn--primary' : 'btn--secondary'}`} style={{ borderRadius: 0 }} onClick={() => setView('summary')}>
+              <Table2 size={15} /> Tổng công tháng
+            </button>
+          </div>
           <select className="input" value={month} onChange={e => setMonth(e.target.value)} style={{ width: '100px' }}>
             {[...Array(12).keys()].map(i => <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>)}
           </select>
@@ -262,13 +302,70 @@ const AttendancePage = () => {
           </select>
           {isAdminOrHR && (
             <>
-              <button className="btn btn--secondary" onClick={handleExport}><Download size={16} /> Xuất CSV</button>
-              <button className="btn btn--primary" onClick={openCreate}><Plus size={16} /> Thêm thủ công</button>
+              <button className="btn btn--secondary" onClick={view === 'summary' ? handleExportSummary : handleExport}>
+                <Download size={16} /> Xuất CSV
+              </button>
+              {view === 'log' && (
+                <button className="btn btn--primary" onClick={openCreate}><Plus size={16} /> Thêm thủ công</button>
+              )}
             </>
           )}
         </div>
       </div>
 
+      {view === 'summary' && (
+        <div className="card card--no-hover">
+          <div className="card__body" style={{ padding: 0 }}>
+            {loading ? (
+              <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 className="animate-spin" /></div>
+            ) : summary.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                Không có dữ liệu tổng công cho tháng {month}/{year}.
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table--zebra">
+                  <thead>
+                    <tr>
+                      <th>Mã NV</th><th>Nhân viên</th><th>Phòng ban</th>
+                      <th title="Số ngày làm việc chuẩn của tháng">Công chuẩn</th>
+                      <th>Đủ công</th><th>Nửa công</th>
+                      <th title="Có chấm vào nhưng quên chấm ra — tạm tính 0.5 công">Thiếu ra</th>
+                      <th>Muộn (lần)</th><th>Phép</th><th>Không lương</th><th>Vắng</th><th>OT (giờ)</th>
+                      <th style={{ fontWeight: 700 }}>TỔNG CÔNG</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summary.map(r => (
+                      <tr key={r.employee_id}>
+                        <td>{r.employee_code}</td>
+                        <td style={{ fontWeight: 600 }}>{r.employee_name}</td>
+                        <td style={{ color: 'var(--color-text-muted)' }}>{r.department || '—'}</td>
+                        <td>{r.standard_days}</td>
+                        <td>{r.full_days}</td>
+                        <td>{r.half_days || ''}</td>
+                        <td style={{ color: r.missing_checkout ? 'var(--color-error)' : undefined }}>
+                          {r.missing_checkout ? `⚠ ${r.missing_checkout}` : ''}
+                        </td>
+                        <td style={{ color: r.late_count ? '#b8860b' : undefined }}>
+                          {r.late_count ? `${r.late_count} (${r.late_minutes}p)` : ''}
+                        </td>
+                        <td>{r.paid_leave || ''}</td>
+                        <td>{r.unpaid_leave || ''}</td>
+                        <td style={{ color: r.absent_days ? 'var(--color-error)' : undefined }}>{r.absent_days || ''}</td>
+                        <td>{r.ot_hours || ''}</td>
+                        <td style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>{r.total_workdays}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {view === 'log' && (
       <div className="card card--no-hover">
         <div className="card__body" style={{ padding: 0 }}>
           {loading ? (
@@ -316,6 +413,7 @@ const AttendancePage = () => {
           )}
         </div>
       </div>
+      )}
 
       {isModalOpen && (
         <div className="modal-overlay">
@@ -348,8 +446,8 @@ const AttendancePage = () => {
                   </div>
                 </div>
                 <div className="form-group">
-                  <label className="form-label form-label--required">Trạng thái</label>
-                  <select className="input" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })} required>
+                  <label className="form-label">Trạng thái</label>
+                  <select className="input" value={formData.status} onChange={e => setFormData({ ...formData, status: e.target.value })}>
                     {STATUS_OPTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
                   </select>
                 </div>

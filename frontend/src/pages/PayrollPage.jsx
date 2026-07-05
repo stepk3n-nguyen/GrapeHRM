@@ -121,35 +121,104 @@ const PayrollPage = () => {
 
       {detail && (
         <div className="modal-overlay">
-          <div className="modal" style={{ maxWidth: 900 }}>
+          <div className="modal" style={{ maxWidth: 980 }}>
             <div className="modal__header">
-              <h3 className="modal__title">Bảng lương tháng {detail.month}/{detail.year} — <span className={`status-badge ${STATUS[detail.status][1]}`}>{STATUS[detail.status][0]}</span></h3>
+              <div>
+                <h3 className="modal__title" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                  Bảng lương tháng {detail.month}/{detail.year}
+                  <span className={`status-badge ${STATUS[detail.status][1]}`}>{STATUS[detail.status][0]}</span>
+                </h3>
+                {detail.company_name && (
+                  <div style={{ fontSize: 13, color: 'var(--color-text-muted)', marginTop: 2 }}>{detail.company_name}</div>
+                )}
+              </div>
               <button className="modal__close" onClick={() => setDetail(null)}><X size={18} /></button>
             </div>
-            <div className="modal__body" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+            <div className="modal__body" style={{ maxHeight: '70vh', overflowY: 'auto', paddingTop: 12 }}>
+
+              {/* ── Tóm tắt đợt lương ── */}
+              {detail.payslips.length > 0 && (() => {
+                const sum = (k) => detail.payslips.reduce((a, p) => a + (p[k] || 0), 0);
+                const cards = [
+                  ['Nhân viên', detail.payslips.length, 'var(--color-primary-dark)'],
+                  ['Tổng thu nhập', fmtMoney(sum('gross_salary')), 'var(--color-success)'],
+                  ['BH + Thuế TNCN', `−${fmtMoney(sum('total_deductions') + sum('personal_income_tax'))}`, 'var(--color-error)'],
+                  ['Tổng thực nhận', fmtMoney(detail.total_amount), 'var(--color-primary)'],
+                ];
+                return (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 10, marginBottom: 14 }}>
+                    {cards.map(([label, value, color]) => (
+                      <div key={label} style={{ background: 'var(--color-bg, #F7F9FC)', border: '1px solid #E4E9F0', borderRadius: 8, padding: '10px 14px' }}>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{label}</div>
+                        <div style={{ fontSize: 16, fontWeight: 700, color, whiteSpace: 'nowrap' }}>{value}</div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+
               <div className="table-responsive">
-                <table className="table table--zebra">
-                  <thead><tr><th>Nhân viên</th><th>Công</th><th>Lương CB</th><th>Phụ cấp</th><th>Tăng ca</th><th>BH</th><th>Thuế TNCN</th><th>Thực nhận</th><th></th></tr></thead>
+                <table className="table payroll-detail-table" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                  <thead>
+                    <tr>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)' }}>Nhân viên</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'center' }}>Công</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'right' }}>Lương CB</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'right' }}>Phụ cấp</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'right' }}>Tăng ca</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'right' }}>Bảo hiểm</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'right' }}>Thuế TNCN</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)', textAlign: 'right' }}>Thực nhận</th>
+                      <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)' }}></th>
+                    </tr>
+                  </thead>
                   <tbody>
                     {detail.payslips.map((p) => (
                       <tr key={p.id}>
-                        <td style={{ fontWeight: 600 }}>{p.employee_name}</td>
-                        <td>{p.total_work_days}/{p.standard_work_days}{p.total_leave_days ? ` (+${p.total_leave_days} phép)` : ''}</td>
-                        <td>{fmtMoney(p.basic_salary)}</td>
-                        <td style={{ color: 'var(--color-success)' }}>+{fmtMoney(p.total_allowances)}</td>
-                        <td style={{ color: 'var(--color-success)' }}>{p.overtime_pay > 0 ? `+${fmtMoney(p.overtime_pay)}` : '—'}</td>
-                        <td style={{ color: 'var(--color-error)' }}>−{fmtMoney(p.total_deductions)}</td>
-                        <td style={{ color: 'var(--color-error)' }}>{p.personal_income_tax > 0 ? `−${fmtMoney(p.personal_income_tax)}` : '—'}</td>
-                        <td style={{ fontWeight: 700, color: 'var(--color-primary-dark)' }}>{fmtMoney(p.net_salary)}</td>
-                        <td><button className="btn btn--secondary" style={{ padding: '4px 9px', fontSize: 12 }} onClick={() => downloadPdf(p.id, `${p.employee_code || p.employee_id}_${detail.month}_${detail.year}`)}><FileText size={13} /> PDF</button></td>
+                        <td>
+                          <div style={{ fontWeight: 600, whiteSpace: 'nowrap' }}>{p.employee_name}</div>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{p.employee_code || ''}</div>
+                        </td>
+                        <td style={{ textAlign: 'center', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontWeight: 600 }}>{p.total_work_days}</span>
+                          <span style={{ color: 'var(--color-text-muted)' }}>/{p.standard_work_days}</span>
+                          {p.total_leave_days > 0 && (
+                            <div><span className="badge badge--info" style={{ fontSize: 11 }}>+{p.total_leave_days} phép</span></div>
+                          )}
+                        </td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>{fmtMoney(p.basic_salary)}</td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--color-success)' }}>+{fmtMoney(p.total_allowances)}</td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap', color: p.overtime_pay > 0 ? 'var(--color-success)' : 'var(--color-text-muted)' }}>
+                          {p.overtime_pay > 0 ? `+${fmtMoney(p.overtime_pay)}` : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--color-error)' }}>−{fmtMoney(p.total_deductions)}</td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap', color: p.personal_income_tax > 0 ? 'var(--color-error)' : 'var(--color-text-muted)' }}>
+                          {p.personal_income_tax > 0 ? `−${fmtMoney(p.personal_income_tax)}` : '—'}
+                        </td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 700, color: 'var(--color-primary-dark)' }}>{fmtMoney(p.net_salary)}</td>
+                        <td style={{ textAlign: 'right' }}>
+                          <button
+                            className="btn btn--secondary" title="Tải phiếu lương PDF"
+                            style={{ padding: '4px 9px', fontSize: 12 }}
+                            onClick={() => downloadPdf(p.id, `${p.employee_code || p.employee_id}_${detail.month}_${detail.year}`)}
+                          >
+                            <FileText size={13} /> PDF
+                          </button>
+                        </td>
                       </tr>
                     ))}
                     {detail.payslips.length === 0 && <tr><td colSpan={9} style={{ textAlign: 'center', padding: 24, color: 'var(--color-text-muted)' }}>Không có phiếu lương. Hãy chắc chắn nhân viên đã được gán mức lương.</td></tr>}
                   </tbody>
+                  {detail.payslips.length > 0 && (
+                    <tfoot>
+                      <tr style={{ background: '#F0F5FF', borderTop: '2px solid var(--color-primary)' }}>
+                        <td colSpan={7} style={{ fontWeight: 700, textAlign: 'right' }}>TỔNG CHI ({detail.payslips.length} nhân viên)</td>
+                        <td style={{ textAlign: 'right', fontWeight: 700, fontSize: 15, color: 'var(--color-primary)', whiteSpace: 'nowrap' }}>{fmtMoney(detail.total_amount)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  )}
                 </table>
-              </div>
-              <div style={{ textAlign: 'right', marginTop: 12, fontSize: 16, fontWeight: 700 }}>
-                Tổng chi: <span style={{ color: 'var(--color-primary)' }}>{fmtMoney(detail.total_amount)}</span>
               </div>
             </div>
             <div className="modal__footer">

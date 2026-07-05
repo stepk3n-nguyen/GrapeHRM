@@ -1,8 +1,9 @@
 """
 Logic tính lương — chạy bảng lương cho 1 tháng/năm của 1 tenant.
-Số ngày công lấy từ Attendance (PRESENT/LATE/HALF_DAY) + ngày nghỉ có lương từ
-LeaveRequest đã duyệt. Ngày công chuẩn = số ngày làm việc (T2–T6) trong tháng,
-ĐÃ loại trừ ngày lễ có hưởng lương (xem app/services/calendar_service.py).
+
+Số ngày công KHÔNG tính riêng ở đây — dùng chung attendance_service.monthly_summary
+(một nguồn sự thật duy nhất với màn hình Tổng công tháng), tránh 2 nơi ra 2 số khác nhau.
+Ngày công chuẩn = số ngày làm việc (T2–T6) trong tháng, đã loại ngày lễ có lương.
 """
 
 import calendar
@@ -12,14 +13,12 @@ from sqlalchemy import extract
 
 from app.extensions import db
 from app.models.employee import Employee
-from app.models.leave import LeaveRequest, Attendance
 from app.models.compensation import (
     SalaryAllowance, SalaryDeduction, EmployeeSalary, PayrollRun, Payslip, PayslipItem,
     OvertimeRequest
 )
-from app.services.calendar_service import (
-    count_standard_working_days, working_days_between
-)
+from app.services.calendar_service import count_standard_working_days
+from app.services.attendance_service import monthly_summary
 from app.services.tax_service import compute_pit
 
 
@@ -42,45 +41,6 @@ def compute_overtime(emp_id, year, month, basic, standard_days):
         total_hours += h
         total_pay += hourly * h * r.multiplier
     return total_hours, total_pay
-
-
-def count_work_days(emp_id, year, month):
-    """Số ngày công thực tế từ chấm công (PRESENT/LATE = 1, HALF_DAY = 0.5)."""
-    from sqlalchemy import extract
-    records = Attendance.query.filter(
-        Attendance.employee_id == emp_id,
-        extract("year", Attendance.date) == year,
-        extract("month", Attendance.date) == month,
-    ).all()
-    total = 0.0
-    for r in records:
-        if r.status in ("PRESENT", "LATE"):
-            total += 1
-        elif r.status == "HALF_DAY":
-            total += 0.5
-    return total
-
-
-def count_leave_days(tenant_id, emp_id, year, month, paid=True):
-    """Số ngày nghỉ (có/không lương) đã duyệt, phần giao với tháng.
-    Loại T7/CN và ngày lễ (nghỉ trùng ngày lễ không bị trừ vào quỹ/ngày nghỉ)."""
-    month_start = date(year, month, 1)
-    month_end = date(year, month, calendar.monthrange(year, month)[1])
-    reqs = LeaveRequest.query.filter(
-        LeaveRequest.employee_id == emp_id,
-        LeaveRequest.status == "APPROVED",
-        LeaveRequest.start_date <= month_end,
-        LeaveRequest.end_date >= month_start,
-    ).all()
-    total = 0
-    for r in reqs:
-        is_paid = r.leave_type.is_paid if r.leave_type else True
-        if is_paid != paid:
-            continue
-        seg_start = max(r.start_date, month_start)
-        seg_end = min(r.end_date, month_end)
-        total += working_days_between(tenant_id, seg_start, seg_end)
-    return total
 
 
 def get_effective_salary(emp_id, year, month):
@@ -116,6 +76,9 @@ def run_payroll(tenant_id, month, year, created_by):
     deductions = SalaryDeduction.query.filter_by(tenant_id=tenant_id).all()
     employees = Employee.query.filter_by(tenant_id=tenant_id, state="ACTIVE").all()
 
+    # Tổng công tháng — MỘT nguồn sự thật (dùng chung với màn hình Tổng công)
+    summary_by_emp = {r["employee_id"]: r for r in monthly_summary(tenant_id, year, month)}
+
     grand_total = 0.0
     for emp in employees:
         sal = get_effective_salary(emp.id, year, month)
@@ -123,9 +86,13 @@ def run_payroll(tenant_id, month, year, created_by):
             continue  # bỏ qua NV chưa được gán mức lương
         basic = float(sal.basic_salary)
 
-        work_days = count_work_days(emp.id, year, month)
-        paid_leave = count_leave_days(tenant_id, emp.id, year, month, paid=True)
-        unpaid_leave = count_leave_days(tenant_id, emp.id, year, month, paid=False)
+        s = summary_by_emp.get(emp.id) or {}
+        # Ngày công thực = ngày đủ công + 0.5 × (nửa công + thiếu chấm ra)
+        work_days = (s.get("full_days", 0)
+                     + 0.5 * s.get("half_days", 0)
+                     + 0.5 * s.get("missing_checkout", 0))
+        paid_leave = s.get("paid_leave", 0.0)
+        unpaid_leave = s.get("unpaid_leave", 0.0)
 
         paid_days = work_days + paid_leave
         ratio = min(paid_days / standard, 1.0)

@@ -304,8 +304,11 @@ def get_payroll(run_id):
     run = PayrollRun.query.filter_by(id=run_id, tenant_id=g.tenant_id).first()
     if not run:
         return jsonify({"error": "Không tìm thấy"}), 404
+    from app.models.tenant import Tenant
+    tenant = Tenant.query.get(g.tenant_id)
     return jsonify({
         "id": run.id, "month": run.month, "year": run.year, "status": run.status,
+        "company_name": tenant.name if tenant else None,
         "total_amount": float(run.total_amount),
         "payslips": [_serialize_payslip(p, detail=True) for p in run.payslips],
     }), 200

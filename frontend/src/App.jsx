@@ -19,9 +19,6 @@ import SalaryConfigPage from './pages/SalaryConfigPage';
 import PayrollPage from './pages/PayrollPage';
 import MyPayslipPage from './pages/MyPayslipPage';
 import OvertimePage from './pages/OvertimePage';
-import ContractsPage from './pages/ContractsPage';
-import RecruitmentPage from './pages/RecruitmentPage';
-import PerformancePage from './pages/PerformancePage';
 import SuperAdminPage from './pages/SuperAdminPage';
 import { Loader2 } from 'lucide-react';
 
@@ -82,7 +79,6 @@ const AppContent = () => {
                   <Route path="/leave" element={<LeavePage />} />
                   <Route path="/attendance" element={<AttendancePage />} />
                   <Route path="/overtime" element={<OvertimePage />} />
-                  <Route path="/performance" element={<PerformancePage />} />
                   <Route path="/my-payslip" element={<MyPayslipPage />} />
                   <Route path="/" element={<Navigate to="/profile" replace />} />
                   <Route path="*" element={<Navigate to="/profile" replace />} />
@@ -96,9 +92,6 @@ const AppContent = () => {
                   <Route path="/attendance" element={<AttendancePage />} />
                   <Route path="/work-config" element={<WorkConfigPage />} />
                   <Route path="/overtime" element={<OvertimePage />} />
-                  <Route path="/contracts" element={<ContractsPage />} />
-                  <Route path="/recruitment" element={<RecruitmentPage />} />
-                  <Route path="/performance" element={<PerformancePage />} />
                   <Route path="/reports" element={<ReportsPage />} />
                   <Route path="/salary-config" element={<SalaryConfigPage />} />
                   <Route path="/payroll" element={<PayrollPage />} />

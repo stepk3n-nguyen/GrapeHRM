@@ -30,8 +30,10 @@ with app.app_context():
     from app.models.user import User
     from app.models.leave import (
         LeaveType, LeavePolicy, EmployeeLeavePolicy,
-        LeaveRequest, LeaveApprovalLog, Attendance,
+        LeaveRequest, LeaveApprovalLog,
     )
+    from app.models.attendance import Attendance
+    from app.models.work import WorkShift
     from app.models.compensation import SalaryStructure, EmployeeSalary
     from app.models.tenant import Tenant
 
@@ -108,6 +110,19 @@ with app.app_context():
         db.session.commit()
         print("  ✓ Địa điểm làm việc demo (bán kính 300m)")
     print()
+
+    # ── Ca làm việc: ngoài ca hành chính mặc định, thêm ca sớm để demo nhiều ca ──
+    default_shift = WorkShift.query.filter_by(tenant_id=TID, is_default=True).first()
+    early_shift = WorkShift.query.filter_by(tenant_id=TID, name="Ca sớm").first()
+    if not early_shift:
+        early_shift = WorkShift(
+            tenant_id=TID, name="Ca sớm",
+            start_time=time(7, 0), end_time=time(16, 0),
+            late_threshold_minutes=10, break_minutes=60, is_default=False,
+        )
+        db.session.add(early_shift)
+        db.session.commit()
+        print("  ✓ Ca sớm (07:00-16:00) — demo nhiều ca")
 
     # ────────────────────────────────────────────────────────────────────
     # 4. NHÂN VIÊN + USER + GÁN LƯƠNG + GÁN CHÍNH SÁCH PHÉP
@@ -205,6 +220,10 @@ with app.app_context():
                 tenant_id=TID, employee_id=emp.id,
                 policy_id=policy.id, effective_year=YEAR,
             ))
+
+        # Gán ca làm việc (Dung làm ca sớm — demo nhiều ca)
+        if emp.shift_id is None:
+            emp.shift_id = early_shift.id if sp["username"] == "dung.pt" else (default_shift.id if default_shift else None)
 
         # Mức lương
         if not EmployeeSalary.query.filter_by(employee_id=emp.id, effective_date=date(2026, 1, 1)).first():
@@ -347,8 +366,8 @@ with app.app_context():
             elif eid in late and day in late[eid]:
                 att = Attendance(tenant_id=TID, employee_id=eid, date=day,
                                  check_in=time(9, 15), check_out=time(18, 0),
-                                 work_hours=7.75, status="LATE", source="MANUAL",
-                                 note="Đến muộn")
+                                 work_hours=7.75, status="LATE", late_minutes=45,
+                                 source="MANUAL", note="Đến muộn")
 
             else:
                 att = Attendance(tenant_id=TID, employee_id=eid, date=day,
@@ -402,79 +421,6 @@ with app.app_context():
             print(f"⚠ Không chạy được bảng lương: {err}\n")
 
     # ────────────────────────────────────────────────────────────────────
-    # 8. PHASE D — Hợp đồng + Tuyển dụng + Đánh giá hiệu suất
-    # ────────────────────────────────────────────────────────────────────
-    from app.models.contract import Contract
-    from app.models.recruitment import JobPosting, Candidate
-    from app.models.performance import ReviewCycle, PerformanceReview, ReviewScore
-
-    # Hợp đồng cho từng nhân viên (Bình sắp hết hạn để demo cảnh báo)
-    contract_specs = [
-        dict(emp=emps["an.nv"],    type="INDEFINITE", start=date(2022, 1, 10), end=None,            num="HD-2022-001"),
-        dict(emp=emps["binh.tt"],  type="FIXED_TERM", start=date(2025, 7, 1),  end=date(2026, 6, 30), num="HD-2025-014"),
-        dict(emp=emps["cuong.lv"], type="FIXED_TERM", start=date(2024, 8, 15), end=date(2026, 8, 14), num="HD-2024-009"),
-        dict(emp=emps["dung.pt"],  type="PROBATION",  start=date(2026, 5, 1),  end=date(2026, 7, 31), num="HD-2026-021"),
-        dict(emp=emps["em.hv"],    type="FIXED_TERM", start=date(2025, 2, 1),  end=date(2027, 1, 31), num="HD-2025-005"),
-    ]
-    c_count = 0
-    for cs in contract_specs:
-        if not Contract.query.filter_by(tenant_id=TID, employee_id=cs["emp"].id).first():
-            db.session.add(Contract(
-                tenant_id=TID, employee_id=cs["emp"].id, contract_number=cs["num"],
-                contract_type=cs["type"], start_date=cs["start"], end_date=cs["end"],
-                signed_date=cs["start"], status="ACTIVE",
-            ))
-            c_count += 1
-    db.session.commit()
-    if c_count:
-        print(f"  ✓ {c_count} hợp đồng lao động (Bình sắp hết hạn 30/06)")
-
-    # Tin tuyển dụng + ứng viên
-    job = JobPosting.query.filter_by(tenant_id=TID, title="Lập trình viên Backend").first()
-    if not job:
-        job = JobPosting(tenant_id=TID, title="Lập trình viên Backend",
-                         department_id=dept_it.id, quantity=2,
-                         description="Tuyển 2 BE (Python/Flask), 1-3 năm kinh nghiệm.",
-                         status="OPEN", posted_date=date(2026, 6, 1))
-        db.session.add(job)
-        db.session.flush()
-        for name, email, stage in [
-            ("Vũ Minh Khôi", "khoi.vm@gmail.com", "INTERVIEW"),
-            ("Đỗ Thu Hà", "ha.dt@gmail.com", "APPLIED"),
-            ("Bùi Tiến Dũng", "dung.bt@gmail.com", "OFFERED"),
-        ]:
-            db.session.add(Candidate(tenant_id=TID, job_posting_id=job.id, full_name=name,
-                                     email=email, stage=stage, applied_date=date(2026, 6, 5)))
-        db.session.commit()
-        print("  ✓ 1 tin tuyển dụng + 3 ứng viên")
-
-    # Kỳ đánh giá + phiếu đánh giá (Bình, Cường)
-    cycle = ReviewCycle.query.filter_by(tenant_id=TID, name="Đánh giá Quý 2/2026").first()
-    if not cycle:
-        cycle = ReviewCycle(tenant_id=TID, name="Đánh giá Quý 2/2026",
-                            start_date=date(2026, 4, 1), end_date=date(2026, 6, 30), status="OPEN")
-        db.session.add(cycle)
-        db.session.flush()
-        review_specs = [
-            dict(emp=emps["binh.tt"], scores=[("Chất lượng công việc", 9, 2), ("Tiến độ", 8, 1), ("Thái độ", 9, 1)], cmt="Hoàn thành tốt, chủ động."),
-            dict(emp=emps["cuong.lv"], scores=[("Chất lượng công việc", 7, 2), ("Tiến độ", 8, 1), ("Thái độ", 8, 1)], cmt="Ổn định, cần cải thiện chất lượng."),
-        ]
-        for rs in review_specs:
-            r = PerformanceReview(tenant_id=TID, cycle_id=cycle.id, employee_id=rs["emp"].id,
-                                  reviewer_id=admin_user.id if admin_user else None,
-                                  status="SUBMITTED", comments=rs["cmt"])
-            db.session.add(r)
-            db.session.flush()
-            tw = sum(w for _, _, w in rs["scores"])
-            tot = 0
-            for crit, sc, w in rs["scores"]:
-                db.session.add(ReviewScore(review_id=r.id, criterion=crit, score=sc, weight=w))
-                tot += sc * w
-            r.overall_score = round(tot / tw, 1)
-        db.session.commit()
-        print("  ✓ 1 kỳ đánh giá + 2 phiếu đánh giá hiệu suất\n")
-
-    # ────────────────────────────────────────────────────────────────────
     # TÓM TẮT
     # ────────────────────────────────────────────────────────────────────
     print("=" * 58)
@@ -491,14 +437,14 @@ with app.app_context():
     print("   em.hv      / Employee@123  → Nhân viên kinh doanh")
     print()
     print("📊 Dữ liệu đã tạo:")
-    print("   • 2 phòng ban  |  3 chức vụ  |  3 cấu trúc lương")
-    print("   • 5 nhân viên + user account")
+    print("   • 2 phòng ban  |  3 chức vụ  |  3 cấu trúc lương  |  2 ca làm việc")
+    print("   • 5 nhân viên + user account (đã gán ca làm việc)")
     print("   • 5 đơn nghỉ phép (2 Approved, 1 Rejected, 1 Pending)")
     print(f"  • {total_att} bản ghi chấm công (T5 + T6/2026)")
     print()
     print("💡 Gợi ý test:")
-    print("   1. Dashboard → xem tổng quan nhân sự + biểu đồ")
-    print("   2. Bảng lương → Chạy lương tháng 5/2026 → xem phiếu lương")
-    print("   3. Báo cáo → Chấm công & Nghỉ phép")
+    print("   1. Dashboard → hôm nay ai đi làm / đi muộn / nghỉ + tổng công tháng")
+    print("   2. Chấm công → tab Tổng công tháng → xuất CSV")
+    print("   3. Bảng lương → Chạy lương tháng 5/2026 → xem phiếu lương")
     print("   4. Đăng nhập binh.tt → góc nhìn nhân viên (Chấm công GPS, Phiếu lương)")
-    print("   5. Đăng nhập an.nv → duyệt đơn nghỉ của em.hv")
+    print("   5. Đăng nhập an.nv → duyệt đơn nghỉ của em.hv → tự sinh chấm công ON_LEAVE")

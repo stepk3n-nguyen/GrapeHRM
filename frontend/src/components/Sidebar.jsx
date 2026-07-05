@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Clock, Clock4, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2, FileSignature, Briefcase, Target } from 'lucide-react';
+import { LayoutDashboard, Users, CalendarDays, Clock, Clock4, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onCloseSidebar }) => {
@@ -14,9 +14,6 @@ const Sidebar = ({ isOpen, onCloseSidebar }) => {
     ...(isAdminOrHR ? [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
     { name: 'Thông tin cá nhân', path: '/profile', icon: Users },
     ...(isAdminOrHR ? [{ name: 'Quản lý nhân viên', path: '/employees', icon: Users }] : []),
-    ...(isAdminOrHR ? [{ name: 'Hợp đồng lao động', path: '/contracts', icon: FileSignature }] : []),
-    ...(isAdminOrHR ? [{ name: 'Tuyển dụng', path: '/recruitment', icon: Briefcase }] : []),
-    { name: 'Đánh giá hiệu suất', path: '/performance', icon: Target },
     { name: 'Nghỉ phép', path: '/leave', icon: CalendarDays },
     { name: 'Chấm công', path: '/attendance', icon: Clock },
     { name: 'Tăng ca', path: '/overtime', icon: Clock4 },

@@ -64,29 +64,3 @@ class LeaveApprovalLog(TimestampMixin, db.Model):
 
     request = db.relationship("LeaveRequest", backref=db.backref("approval_logs", cascade="all, delete-orphan"))
     approver = db.relationship("User")
-
-class Attendance(TenantMixin, TimestampMixin, db.Model):
-    __tablename__ = "attendance"
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id', ondelete='CASCADE'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    check_in = db.Column(db.Time)
-    check_out = db.Column(db.Time)
-    work_hours = db.Column(db.Numeric(4, 1))
-    status = db.Column(db.Enum('PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'ON_LEAVE', name='attendance_status'), nullable=False)
-    note = db.Column(db.Text)
-
-    # ── Geofence (toạ độ lúc chấm vào/ra) ───────────────────────────────
-    check_in_lat = db.Column(db.Numeric(9, 6))
-    check_in_lng = db.Column(db.Numeric(9, 6))
-    check_out_lat = db.Column(db.Numeric(9, 6))
-    check_out_lng = db.Column(db.Numeric(9, 6))
-    # Khoảng cách (m) từ vị trí chấm vào tới địa điểm công ty gần nhất
-    check_in_distance_m = db.Column(db.Integer)
-    is_within_geofence = db.Column(db.Boolean)
-    # Nguồn dữ liệu: nhân viên tự chấm (SELF) hay HR nhập tay (MANUAL)
-    source = db.Column(db.Enum('SELF', 'MANUAL', name='attendance_source'), default='MANUAL')
-
-    __table_args__ = (db.UniqueConstraint('employee_id', 'date'),)
-
-    employee = db.relationship("Employee", backref=db.backref("attendances", cascade="all, delete-orphan"))

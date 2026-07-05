@@ -11,7 +11,8 @@ from flask_jwt_extended.exceptions import NoAuthorizationError
 
 
 # Danh sách các URL prefix không cần xác thực tenant
-PUBLIC_PREFIXES = ("/api/auth/login", "/api/auth/refresh", "/api/health")
+PUBLIC_PREFIXES = ("/api/auth/login", "/api/auth/refresh", "/api/health",
+                   "/api/tenants/register")
 
 
 def tenant_filter_middleware(app):

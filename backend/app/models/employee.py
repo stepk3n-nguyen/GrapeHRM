@@ -29,6 +29,9 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
     marital_status = db.Column(db.String(20), nullable=True)
     birthday = db.Column(db.Date, nullable=True)
 
+    # Số người phụ thuộc — dùng tính giảm trừ gia cảnh khi tính thuế TNCN
+    num_dependents = db.Column(db.Integer, nullable=False, default=0)
+
     # ── Thông tin liên hệ ────────────────────────────────────────────
 
     mobile = db.Column(db.String(50), nullable=True)
@@ -62,6 +65,15 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
         db.ForeignKey("departments.id", ondelete="SET NULL"),
         nullable=True,
     )
+
+    # Ca làm việc được gán cho nhân viên — nếu NULL dùng ca mặc định của công ty.
+    # Cho phép mỗi nhân viên một ca khác nhau (hỗ trợ nhiều ca thực sự).
+    shift_id = db.Column(
+        db.Integer,
+        db.ForeignKey("work_shifts.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    shift = db.relationship("WorkShift", foreign_keys=[shift_id])
 
     # ── Quan hệ với User (1 Employee ↔ 1 User account) ──────────────
 

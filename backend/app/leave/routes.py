@@ -1,20 +1,20 @@
 """
-Blueprint Leave — Xử lý nghiệp vụ Thời gian & Nghỉ phép.
-Bao gồm các chức năng: Loại nghỉ phép, Chính sách, Đơn nghỉ phép, Số dư, Chấm công.
+Blueprint Leave — Xử lý nghiệp vụ Nghỉ phép.
+Bao gồm: Loại nghỉ phép, Chính sách, Đơn nghỉ phép, Số dư phép.
+(Chấm công / ca làm việc / địa điểm đã tách sang app/attendance/routes.py)
 """
 
-from datetime import datetime, date
-import csv
-import io
-from flask import Blueprint, request, jsonify, g, Response, current_app
+from datetime import datetime, date, timedelta
+from flask import Blueprint, request, jsonify, g, current_app
 from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 from sqlalchemy import extract
 
 from app.extensions import db
 from app.models.leave import (
     LeaveType, LeavePolicy, LeavePolicyDetail, EmployeeLeavePolicy,
-    LeaveRequest, LeaveApprovalLog, Attendance
+    LeaveRequest, LeaveApprovalLog
 )
+from app.models.attendance import Attendance
 from app.models.employee import Employee
 from app.models.user import User
 from app.services.email_service import (
@@ -28,6 +28,58 @@ def check_hr_admin():
     """Kiểm tra xem user hiện tại có role là admin hoặc hr_manager không."""
     claims = get_jwt()
     return claims.get("role") in ["super_admin", "admin", "hr_manager"]
+
+
+def _current_employee():
+    """Lấy hồ sơ Employee gắn với user đang đăng nhập (cùng tenant)."""
+    user = User.query.get(int(get_jwt_identity()))
+    if not user or not user.employee_id:
+        return None
+    return Employee.query.filter_by(id=user.employee_id, tenant_id=g.tenant_id).first()
+
+
+def _count_working_days(start, end, half_day=False):
+    """Đếm số ngày làm việc từ start..end (loại T7/CN VÀ ngày lễ có lương).
+    Trả về số ngày (float). half_day=True và cùng 1 ngày → 0.5."""
+    if end < start:
+        return 0.0
+    from app.services.calendar_service import working_days_between
+    days = working_days_between(g.tenant_id, start, end)
+    if half_day and start == end:
+        return 0.5
+    return float(days)
+
+
+def _sync_leave_attendance(req, create):
+    """Đồng bộ chấm công ON_LEAVE theo đơn nghỉ.
+
+    create=True  → sinh bản ghi ON_LEAVE cho từng ngày làm việc trong đơn
+                   (bỏ T7/CN và ngày lễ; không đụng vào ngày đã có chấm công).
+    create=False → xóa các bản ghi ON_LEAVE trong khoảng ngày của đơn
+                   (khi đơn bị từ chối/hủy sau khi đã duyệt).
+    """
+    from app.services.calendar_service import holiday_dates, is_working_day
+
+    hol = set()
+    for y in range(req.start_date.year, req.end_date.year + 1):
+        hol |= holiday_dates(g.tenant_id, y)
+
+    cur = req.start_date
+    while cur <= req.end_date:
+        existing = Attendance.query.filter_by(
+            tenant_id=g.tenant_id, employee_id=req.employee_id, date=cur
+        ).first()
+        if create:
+            if is_working_day(cur, hol) and existing is None:
+                db.session.add(Attendance(
+                    tenant_id=g.tenant_id, employee_id=req.employee_id, date=cur,
+                    status="ON_LEAVE", source="MANUAL",
+                    note=f"Nghỉ phép: {req.leave_type.name if req.leave_type else ''}".strip(),
+                ))
+        else:
+            if existing is not None and existing.status == "ON_LEAVE":
+                db.session.delete(existing)
+        cur += timedelta(days=1)
 
 
 # ── 1. BLUEPRINT: LOẠI NGHỈ PHÉP (LEAVE TYPES) ──────────────────────────
@@ -239,23 +291,81 @@ leave_request_bp = Blueprint("leave_request", __name__, url_prefix="/api/leave-r
 @leave_request_bp.route("", methods=["POST"])
 @jwt_required()
 def create_request():
-    data = request.get_json()
-    emp_id = data.get("employee_id")
-    # Tạm thời, user cần truyền employee_id của mình lên
-    emp = Employee.query.filter_by(id=emp_id, tenant_id=g.tenant_id).first()
-    if not emp: return jsonify({"error": "Nhân viên không hợp lệ"}), 400
-    
+    data = request.get_json(silent=True) or {}
     claims = get_jwt()
     role = claims.get("role")
+
+    # 1) Xác định nhân viên: employee chỉ được nộp cho CHÍNH MÌNH (vá rò rỉ quyền)
+    if role == "employee":
+        emp = _current_employee()
+        if not emp:
+            return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
+        emp_id = emp.id
+    else:
+        emp_id = data.get("employee_id")
+        emp = Employee.query.filter_by(id=emp_id, tenant_id=g.tenant_id).first()
+        if not emp:
+            return jsonify({"error": "Nhân viên không hợp lệ"}), 400
+
+    # 2) Loại nghỉ phép hợp lệ trong tenant
+    leave_type = LeaveType.query.filter_by(id=data.get("leave_type_id"), tenant_id=g.tenant_id).first()
+    if not leave_type:
+        return jsonify({"error": "Loại nghỉ phép không hợp lệ"}), 400
+
+    # 3) Validate ngày
+    try:
+        start_d = datetime.strptime(str(data.get("start_date")), "%Y-%m-%d").date()
+        end_d = datetime.strptime(str(data.get("end_date")), "%Y-%m-%d").date()
+    except ValueError:
+        return jsonify({"error": "Ngày không hợp lệ"}), 400
+    if start_d > end_d:
+        return jsonify({"error": "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc"}), 400
+
+    # 4) Server TỰ TÍNH số ngày nghỉ (loại T7/CN) — không tin total_days từ client
+    half_day = bool(data.get("half_day"))
+    total_days = _count_working_days(start_d, end_d, half_day)
+    if total_days <= 0:
+        return jsonify({"error": "Khoảng ngày đã chọn không có ngày làm việc nào"}), 400
+
+    # 5) Chặn trùng/chồng ngày với đơn đang chờ hoặc đã duyệt
+    overlap = LeaveRequest.query.filter(
+        LeaveRequest.employee_id == emp_id,
+        LeaveRequest.status.in_(["PENDING_HR", "APPROVED"]),
+        LeaveRequest.start_date <= end_d,
+        LeaveRequest.end_date >= start_d,
+    ).first()
+    if overlap:
+        return jsonify({"error": "Khoảng ngày này trùng với một đơn nghỉ phép khác"}), 400
+
+    # 6) Enforce số dư phép (chỉ với loại phép có hạn mức trong chính sách)
+    year = start_d.year
+    assign = EmployeeLeavePolicy.query.filter_by(employee_id=emp_id, effective_year=year).first()
+    policy = assign.policy if assign else LeavePolicy.query.filter_by(tenant_id=g.tenant_id, is_default=True).first()
+    entitlement = 0
+    if policy:
+        detail = next((d for d in policy.details if d.leave_type_id == leave_type.id), None)
+        entitlement = detail.entitlement if detail else 0
+    if entitlement and entitlement > 0:
+        existing = LeaveRequest.query.filter(
+            LeaveRequest.employee_id == emp_id,
+            LeaveRequest.leave_type_id == leave_type.id,
+            extract('year', LeaveRequest.start_date) == year,
+            LeaveRequest.status.in_(["APPROVED", "PENDING_HR"]),
+        ).all()
+        consumed = sum(float(r.total_days) for r in existing)
+        remaining = entitlement - consumed
+        if total_days > remaining:
+            return jsonify({"error": f"Vượt quỹ phép: chỉ còn {remaining:g} ngày, bạn đang xin {total_days:g} ngày"}), 400
+
     initial_status = "APPROVED" if role == "hr_manager" else "PENDING_HR"
 
     req = LeaveRequest(
         tenant_id=g.tenant_id,
         employee_id=emp_id,
-        leave_type_id=data["leave_type_id"],
-        start_date=data["start_date"],
-        end_date=data["end_date"],
-        total_days=data["total_days"],
+        leave_type_id=leave_type.id,
+        start_date=start_d,
+        end_date=end_d,
+        total_days=total_days,
         reason=data.get("reason"),
         status=initial_status
     )
@@ -296,26 +406,27 @@ def get_requests():
     role = claims.get("role")
     
     query = LeaveRequest.query.filter_by(tenant_id=tenant_id)
-    
+
     # Filter theo status/tháng/năm từ params
     status = request.args.get("status")
     if status: query = query.filter_by(status=status)
-    
-    emp_id = request.args.get("employee_id")
-    if emp_id: query = query.filter_by(employee_id=emp_id)
-    
+
     year = request.args.get("year")
     if year: query = query.filter(extract('year', LeaveRequest.start_date) == int(year))
-    
+
     # Phân quyền xem đơn
     if role == "employee":
-        # (TODO: Lấy emp_id của user hiện tại, tạm thời lấy qua param)
-        if not emp_id: return jsonify({"error": "Yêu cầu employee_id"}), 400
-        query = query.filter_by(employee_id=emp_id)
-    elif role == "hr_manager" or role == "admin":
-        if not status:
-            pass # See all
-            
+        # Nhân viên CHỈ xem đơn của chính mình — lấy từ token, không tin param
+        emp = _current_employee()
+        if not emp:
+            return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
+        query = query.filter_by(employee_id=emp.id)
+    else:
+        # HR/Admin có thể lọc theo employee_id nếu truyền lên
+        emp_id = request.args.get("employee_id")
+        if emp_id:
+            query = query.filter_by(employee_id=emp_id)
+
     reqs = query.order_by(LeaveRequest.created_at.desc()).all()
     res = []
     for r in reqs:
@@ -349,6 +460,10 @@ def approve_request(req_id):
         req.status = "APPROVED"
         log = LeaveApprovalLog(request_id=req.id, approver_id=user_id, action="APPROVED", comment=comment)
         db.session.add(log)
+        from app.services.audit_service import log_action
+        log_action("APPROVE", "LEAVE_REQUEST", req.id)
+        # Tự sinh chấm công ON_LEAVE cho các ngày nghỉ đã duyệt
+        _sync_leave_attendance(req, create=True)
         db.session.commit()
         
         # Email NV
@@ -369,10 +484,14 @@ def reject_request(req_id):
     data = request.get_json(silent=True) or {}
     reason = data.get("comment", "")
     
+    was_approved = req.status == "APPROVED"
     req.status = "REJECTED"
     req.rejection_reason = reason
     log = LeaveApprovalLog(request_id=req.id, approver_id=get_jwt_identity(), action="REJECTED", comment=reason)
     db.session.add(log)
+    # Nếu đơn từng được duyệt → gỡ các bản ghi ON_LEAVE đã sinh
+    if was_approved:
+        _sync_leave_attendance(req, create=False)
     db.session.commit()
     
     if req.employee.work_email:
@@ -463,100 +582,3 @@ def get_balance(emp_id):
         })
         
     return jsonify(res), 200
-
-
-# ── 5. BLUEPRINT: CHẤM CÔNG (ATTENDANCE) ────────────────────────────────
-attendance_bp = Blueprint("attendance", __name__, url_prefix="/api/attendance")
-
-@attendance_bp.route("", methods=["GET"])
-@jwt_required()
-def get_attendance():
-    month = request.args.get("month")
-    year = request.args.get("year")
-    emp_id = request.args.get("employee_id")
-    
-    query = Attendance.query.filter_by(tenant_id=g.tenant_id)
-    if emp_id: query = query.filter_by(employee_id=emp_id)
-    if month: query = query.filter(extract('month', Attendance.date) == int(month))
-    if year: query = query.filter(extract('year', Attendance.date) == int(year))
-    
-    records = query.order_by(Attendance.date.desc()).all()
-    res = []
-    for r in records:
-        res.append({
-            "id": r.id,
-            "employee_id": r.employee_id,
-            "employee_name": r.employee.full_name(),
-            "date": r.date.isoformat(),
-            "check_in": r.check_in.isoformat() if r.check_in else None,
-            "check_out": r.check_out.isoformat() if r.check_out else None,
-            "work_hours": float(r.work_hours) if r.work_hours else 0,
-            "status": r.status,
-            "note": r.note
-        })
-    return jsonify(res), 200
-
-@attendance_bp.route("", methods=["POST"])
-@jwt_required()
-def create_attendance():
-    if not check_hr_admin(): return jsonify({"error": "Không có quyền"}), 403
-    data = request.get_json()
-    
-    # Calc hours
-    check_in = data.get("check_in")
-    check_out = data.get("check_out")
-    work_hours = 0
-    if check_in and check_out:
-        # Simple calc assuming same day
-        in_time = datetime.strptime(check_in, "%H:%M")
-        out_time = datetime.strptime(check_out, "%H:%M")
-        diff = (out_time - in_time).total_seconds() / 3600
-        work_hours = round(max(diff, 0), 1)
-        
-    att = Attendance(
-        tenant_id=g.tenant_id,
-        employee_id=data["employee_id"],
-        date=data["date"],
-        check_in=check_in,
-        check_out=check_out,
-        work_hours=work_hours,
-        status=data.get("status", "PRESENT"),
-        note=data.get("note")
-    )
-    db.session.add(att)
-    db.session.commit()
-    return jsonify({"message": "Thêm thành công"}), 201
-
-@attendance_bp.route("/export", methods=["GET"])
-@jwt_required()
-def export_attendance():
-    if not check_hr_admin(): return jsonify({"error": "Không có quyền"}), 403
-    month = request.args.get("month", date.today().month)
-    year = request.args.get("year", date.today().year)
-    
-    records = Attendance.query.filter(
-        Attendance.tenant_id == g.tenant_id,
-        extract('month', Attendance.date) == int(month),
-        extract('year', Attendance.date) == int(year)
-    ).all()
-    
-    output = io.StringIO()
-    writer = csv.writer(output)
-    writer.writerow(["Mã NV", "Tên NV", "Ngày", "Check-in", "Check-out", "Giờ làm", "Trạng thái", "Ghi chú"])
-    for r in records:
-        writer.writerow([
-            r.employee.employee_id,
-            r.employee.full_name(),
-            r.date.strftime("%d/%m/%Y"),
-            r.check_in.strftime("%H:%M") if r.check_in else "",
-            r.check_out.strftime("%H:%M") if r.check_out else "",
-            r.work_hours or 0,
-            r.status,
-            r.note or ""
-        ])
-        
-    return Response(
-        output.getvalue().encode("utf-8-sig"),
-        mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment;filename=attendance_{month}_{year}.csv"}
-    )

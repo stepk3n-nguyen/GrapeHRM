@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Lock, User, AlertCircle, Loader2 } from 'lucide-react';
+import { Lock, User, Building2, AlertCircle, Loader2 } from 'lucide-react';
 import logoFull from '../assets/img/logo-full.svg';
 
 const LoginPage = () => {
   const { login } = useAuth();
+  const [tenantSlug, setTenantSlug] = useState('');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -15,13 +16,18 @@ const LoginPage = () => {
     setError('');
 
     const trimmedUsername = username.trim();
+    const trimmedSlug = tenantSlug.trim().toLowerCase();
+    if (!trimmedSlug) {
+      setError('Vui lòng nhập mã tổ chức.');
+      return;
+    }
     if (!trimmedUsername || !password) {
       setError('Vui lòng nhập tên tài khoản và mật khẩu.');
       return;
     }
 
     setLoading(true);
-    const result = await login(trimmedUsername, password);
+    const result = await login(trimmedUsername, password, trimmedSlug);
     setLoading(false);
 
     if (!result.success) {
@@ -57,6 +63,36 @@ const LoginPage = () => {
         )}
 
         <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label className="form-label form-label--required" htmlFor="tenantSlug">Mã tổ chức</label>
+            <div style={{ position: 'relative' }}>
+              <Building2
+                size={16}
+                style={{
+                  position: 'absolute',
+                  left: '12px',
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  color: 'var(--color-text-muted)'
+                }}
+              />
+              <input
+                id="tenantSlug"
+                type="text"
+                className="input"
+                placeholder="ví dụ: grapecorp"
+                value={tenantSlug}
+                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
+                style={{ paddingLeft: '38px' }}
+                disabled={loading}
+                autoCapitalize="none"
+              />
+            </div>
+            <small style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+              Liên hệ quản trị viên nếu bạn chưa biết mã tổ chức.
+            </small>
+          </div>
+
           <div className="form-group">
             <label className="form-label" htmlFor="username">Tên tài khoản</label>
             <div style={{ position: 'relative' }}>
@@ -127,7 +163,7 @@ const LoginPage = () => {
         </form>
 
         {/* <div style={{ marginTop: '24px', textAlign: 'center', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-          <p>Tài khoản mẫu: <strong>admin</strong> / <strong>admin123</strong></p>
+          <p>Tài khoản mẫu — Mã tổ chức: <strong>grapecorp</strong> · <strong>admin</strong> / <strong>admin123</strong></p>
         </div> */}
       </div>
     </div>

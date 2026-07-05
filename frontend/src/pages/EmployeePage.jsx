@@ -23,6 +23,7 @@ const EmployeePage = () => {
 
   // Trạng thái quản lý Phòng ban (Departments)
   const [departments, setDepartments] = useState([]);
+  const [shifts, setShifts] = useState([]);
   const [isDeptModalOpen, setIsDeptModalOpen] = useState(false);
   const [editingDept, setEditingDept] = useState(null);
   const [deptFormData, setDeptFormData] = useState({ name: '', description: '' });
@@ -36,6 +37,7 @@ const EmployeePage = () => {
     gender: '1',
     marital_status: 'Single',
     birthday: '',
+    num_dependents: 0,
     mobile: '',
     work_email: '',
     joined_date: '',
@@ -43,6 +45,7 @@ const EmployeePage = () => {
     address: '',
     title_id: '',
     department_id: '',
+    shift_id: '',
     profile_pic_url: '',
     role: 'employee'
   });
@@ -88,6 +91,15 @@ const EmployeePage = () => {
     }
   };
 
+  const fetchShifts = async () => {
+    try {
+      const response = await fetch('/api/work-shifts', { headers: getAuthHeaders() });
+      if (response.ok) setShifts(await response.json());
+    } catch (err) {
+      console.error('Fetch shifts error:', err);
+    }
+  };
+
   const fetchEmployees = async () => {
     setLoading(true);
     try {
@@ -113,6 +125,7 @@ const EmployeePage = () => {
     fetchEmployees();
     fetchTitles();
     fetchDepartments();
+    fetchShifts();
   }, []);
 
   // Vô hiệu hóa cuộn trang của body khi bất kỳ Modal nào đang mở
@@ -145,6 +158,7 @@ const EmployeePage = () => {
       gender: '1',
       marital_status: 'Single',
       birthday: '',
+      num_dependents: 0,
       mobile: '',
       work_email: '',
       joined_date: new Date().toISOString().split('T')[0],
@@ -152,6 +166,7 @@ const EmployeePage = () => {
       address: '',
       title_id: '',
       department_id: '',
+      shift_id: '',
       profile_pic_url: '',
       role: 'employee'
     });
@@ -168,6 +183,7 @@ const EmployeePage = () => {
       gender: emp.gender !== null ? String(emp.gender) : '1',
       marital_status: emp.marital_status || 'Single',
       birthday: emp.birthday || '',
+      num_dependents: emp.num_dependents || 0,
       mobile: emp.mobile || '',
       work_email: emp.work_email || '',
       joined_date: emp.joined_date || '',
@@ -175,6 +191,7 @@ const EmployeePage = () => {
       address: emp.address || '',
       title_id: emp.title_id !== null ? String(emp.title_id) : '',
       department_id: emp.department_id !== null ? String(emp.department_id) : '',
+      shift_id: emp.shift_id ? String(emp.shift_id) : '',
       profile_pic_url: emp.profile_pic_url || '',
       role: emp.role || 'employee'
     });
@@ -193,6 +210,7 @@ const EmployeePage = () => {
       gender: parseInt(formData.gender),
       title_id: formData.title_id ? parseInt(formData.title_id) : null,
       department_id: formData.department_id ? parseInt(formData.department_id) : null,
+      shift_id: formData.shift_id ? parseInt(formData.shift_id) : null,
     };
 
     const isEdit = !!editEmployee;
@@ -577,6 +595,22 @@ const EmployeePage = () => {
                       {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
                     </select>
                   </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="shift_id">Ca làm việc</label>
+                    <select
+                      id="shift_id"
+                      className="input"
+                      value={formData.shift_id}
+                      onChange={(e) => setFormData({ ...formData, shift_id: e.target.value })}
+                    >
+                      <option value="">Ca mặc định của công ty</option>
+                      {shifts.map((sh) => (
+                        <option key={sh.id} value={sh.id}>
+                          {sh.name} ({sh.start_time}-{sh.end_time}){sh.is_default ? ' — mặc định' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 {/* Hàng 2 */}
@@ -646,6 +680,17 @@ const EmployeePage = () => {
                       <option value="Married">Đã kết hôn</option>
                       <option value="Divorced">Đã ly hôn</option>
                     </select>
+                  </div>
+                  <div className="form-group" style={{ marginBottom: 0 }}>
+                    <label className="form-label" htmlFor="num_dependents">Người phụ thuộc (giảm trừ thuế)</label>
+                    <input
+                      type="number"
+                      id="num_dependents"
+                      min="0"
+                      className="input"
+                      value={formData.num_dependents}
+                      onChange={(e) => setFormData({ ...formData, num_dependents: e.target.value })}
+                    />
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="mobile">Số điện thoại</label>

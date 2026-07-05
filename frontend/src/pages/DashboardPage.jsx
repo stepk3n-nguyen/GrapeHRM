@@ -1,187 +1,130 @@
 import React, { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Users, UserCheck, CalendarRange, Landmark, HelpCircle, ArrowRight } from 'lucide-react';
+import {
+  Users, UserCheck, UserX, CalendarRange, Activity, AlarmClock,
+  ArrowRight, BarChart3, CalendarCheck2,
+} from 'lucide-react';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell } from 'recharts';
 
+// Dashboard xoay quanh CHẤM CÔNG: hôm nay ai đi làm / muộn / nghỉ / vắng
+// và tổng công tháng hiện tại (tính động từ dữ liệu chấm công).
 const DashboardPage = () => {
   const { user, getAuthHeaders } = useAuth();
-  const [employeeCount, setEmployeeCount] = useState('...');
-  const [pendingLeaveCount, setPendingLeaveCount] = useState('...');
+  const [stats, setStats] = useState(null);
 
   useEffect(() => {
-    const fetchEmployeeCount = async () => {
+    const fetchStats = async () => {
       try {
-        const response = await fetch('/api/employees', {
-          method: 'GET',
-          headers: getAuthHeaders(),
-        });
-        if (response.ok) {
-          const data = await response.json();
-          setEmployeeCount(String(data.length));
-        } else {
-          setEmployeeCount('N/A');
-        }
-      } catch (err) {
-        console.error('Fetch employee count error:', err);
-        setEmployeeCount('N/A');
-      }
+        const res = await fetch('/api/reports/dashboard-stats', { headers: getAuthHeaders() });
+        if (res.ok) setStats(await res.json());
+      } catch (err) { console.error(err); }
     };
-
-      const fetchPendingLeaves = async () => {
-      try {
-        let count = 0;
-        if (user?.role === 'admin' || user?.role === 'hr_manager') {
-          const hrRes = await fetch('/api/leave-requests?status=PENDING_HR', { headers: getAuthHeaders() });
-          if (hrRes.ok) {
-            const hrData = await hrRes.json();
-            count += hrData.length;
-          }
-        }
-        setPendingLeaveCount(String(count));
-      } catch (err) {
-        setPendingLeaveCount('N/A');
-      }
-    };
-
-    fetchEmployeeCount();
-    fetchPendingLeaves();
+    fetchStats();
   }, []);
 
-  const widgets = [
-    { label: 'Tổng nhân viên', value: employeeCount, icon: Users, variant: 'primary' },
-    { label: 'Đang tuyển dụng', value: '4', icon: UserCheck, variant: 'accent' },
-    { label: 'Yêu cầu nghỉ phép', value: pendingLeaveCount, icon: CalendarRange, variant: 'success' },
+  const today = stats?.today || {};
+  const month = stats?.month || {};
+  const v = (n) => (stats ? String(n ?? 0) : '...');
+
+  // Hàng 1 — HÔM NAY (nguồn: chấm công)
+  const todayWidgets = [
+    { label: 'Đi làm hôm nay', value: v(today.present), icon: UserCheck, variant: 'success' },
+    { label: 'Đi muộn hôm nay', value: v(today.late), icon: AlarmClock, variant: 'primary' },
+    { label: 'Nghỉ phép hôm nay', value: v(today.on_leave), icon: CalendarRange, variant: 'accent' },
+    { label: today.is_working_day === false ? 'Hôm nay nghỉ' : 'Vắng / chưa chấm', value: v(today.absent), icon: UserX, variant: 'primary' },
   ];
+
+  // Hàng 2 — nhân sự & tháng này
+  const monthWidgets = [
+    { label: 'Nhân viên đang làm', value: v(stats?.active_employees), icon: Users, variant: 'primary' },
+    { label: `Tổng công T${month.month || ''}`, value: stats ? `${month.total_workdays ?? 0}` : '...', icon: CalendarCheck2, variant: 'success' },
+    { label: 'Đơn phép chờ duyệt', value: v(stats?.pending_leave_requests), icon: CalendarRange, variant: 'accent' },
+    { label: 'Giờ OT tháng này', value: stats ? `${month.ot_hours ?? 0}h` : '...', icon: Activity, variant: 'primary' },
+  ];
+
+  const rate = today.attendance_rate || 0;
+  const rateData = [{ name: 'Đi làm', value: rate }, { name: 'Còn lại', value: Math.max(100 - rate, 0) }];
 
   return (
     <div className="fade-in">
-      <div className="breadcrumb">
-        <span>GrapeHRM</span>
-        <span>&gt;</span>
-        <span className="breadcrumb__item">Dashboard</span>
-      </div>
+      <div className="breadcrumb"><span>GrapeHRM</span><span>&gt;</span><span className="breadcrumb__item">Dashboard</span></div>
 
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>
-          Xin chào, {user ? user.username : 'HR Manager'}!
-        </h2>
+        <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Xin chào, {user ? user.username : 'HR Manager'}!</h2>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>
-          Hôm nay là một ngày tuyệt vời để quản lý nguồn lực doanh nghiệp của bạn.
+          Tình hình chấm công hôm nay {today.date ? `(${new Date(today.date).toLocaleDateString('vi-VN')})` : ''} và tổng công tháng hiện tại.
         </p>
       </div>
 
-      {/* Grid widgets thống kê */}
       <div className="dashboard-grid">
-        {widgets.map((widget, idx) => {
-          const Icon = widget.icon;
+        {todayWidgets.map((w, idx) => {
+          const Icon = w.icon;
           return (
             <div className="widget" key={idx}>
               <div className="widget__info">
-                <span className="widget__label">{widget.label}</span>
-                <span className="widget__value">{widget.value}</span>
+                <span className="widget__label">{w.label}</span>
+                <span className="widget__value">{w.value}</span>
               </div>
-              <div className={`widget__icon-wrapper widget__icon-wrapper--${widget.variant}`}>
-                <Icon size={24} />
-              </div>
+              <div className={`widget__icon-wrapper widget__icon-wrapper--${w.variant}`}><Icon size={24} /></div>
             </div>
           );
         })}
       </div>
 
-      {/* Grid 2 cột cho các hoạt động chính */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }}>
-        
-        {/* Cột trái: Quy trình tổng quan HRM */}
-        <div className="card">
-          <div className="card__header">
-            <h3 className="card__title">
-              <Landmark size={18} />
-              <span>Quy trình Nhân sự HRM</span>
-            </h3>
-          </div>
-          <div className="card__body">
-            <p style={{ color: 'var(--color-text-secondary)', marginBottom: '16px', fontSize: '13px' }}>
-              Chuỗi quy trình HRM tích hợp từ Tuyển dụng đến Nghỉ hưu trong GrapeHRM được thiết lập tự động hóa:
-            </p>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-              {[
-                { step: '01', title: 'Tuyển dụng', desc: 'Đăng tuyển vị trí & Thu hút CV ứng viên.' },
-                { step: '02', title: 'Onboarding', desc: 'Thiết lập hồ sơ cá nhân & Cấp tài khoản mới.' },
-                { step: '03', title: 'Quản lý nhân viên', desc: 'Hồ sơ nhân sự, hợp đồng lao động & thông tin liên hệ.' },
-                { step: '04', title: 'Time & Leave', desc: 'Phê duyệt ngày nghỉ, ngày phép & theo dõi chuyên cần.' },
-                { step: '05', title: 'Tính lương & Đánh giá', desc: 'Lập bảng lương tự động & theo dõi mục tiêu KPI.' }
-              ].map((item, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '14px', borderBottom: '1px solid var(--color-border-light)', paddingBottom: '10px' }}>
-                  <div style={{ 
-                    backgroundColor: 'var(--color-primary-light)', 
-                    color: 'var(--color-primary)', 
-                    fontWeight: 700, 
-                    width: '32px', 
-                    height: '32px', 
-                    borderRadius: '50%', 
-                    display: 'flex', 
-                    alignItems: 'center', 
-                    justifyContent: 'center',
-                    fontSize: '12px',
-                    flexShrink: 0
-                  }}>
-                    {item.step}
-                  </div>
-                  <div>
-                    <h4 style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)' }}>{item.title}</h4>
-                    <p style={{ fontSize: '11px', color: 'var(--color-text-muted)' }}>{item.desc}</p>
-                  </div>
-                </div>
-              ))}
+      <div className="dashboard-grid" style={{ marginTop: '16px' }}>
+        {monthWidgets.map((w, idx) => {
+          const Icon = w.icon;
+          return (
+            <div className="widget" key={idx}>
+              <div className="widget__info">
+                <span className="widget__label">{w.label}</span>
+                <span className="widget__value">{w.value}</span>
+              </div>
+              <div className={`widget__icon-wrapper widget__icon-wrapper--${w.variant}`}><Icon size={24} /></div>
             </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px', marginTop: '24px' }}>
+        <div className="card card--no-hover">
+          <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card__title"><BarChart3 size={18} /><span>Nhân sự theo phòng ban</span></h3>
+            <Link to="/reports" className="btn btn--secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>Xem báo cáo <ArrowRight size={12} /></Link>
+          </div>
+          <div className="card__body" style={{ height: 260 }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={stats?.departments_summary || []} layout="vertical" margin={{ left: 30 }}>
+                <XAxis type="number" allowDecimals={false} /><YAxis type="category" dataKey="name" width={110} /><Tooltip />
+                <Bar dataKey="count" name="Số NV" fill="#0A6ED1" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Cột phải: Tin tức nội bộ / Phím tắt nhanh */}
-        <div className="card">
-          <div className="card__header">
-            <h3 className="card__title">
-              <HelpCircle size={18} />
-              <span>Lối tắt & Tiện ích nhanh</span>
-            </h3>
+        <div className="card card--no-hover">
+          <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h3 className="card__title"><Activity size={18} /><span>Tỷ lệ đi làm hôm nay</span></h3>
+            <Link to="/attendance" className="btn btn--secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>Bảng chấm công <ArrowRight size={12} /></Link>
           </div>
-          <div className="card__body">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              <div style={{ padding: '16px', backgroundColor: 'var(--color-secondary-light)', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--color-accent)' }}>
-                <h4 style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                  Bảo mật Multi-Tenant hoạt động
-                </h4>
-                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                  Mọi dữ liệu bạn thao tác trên GrapeHRM đều được mã hóa và cô lập hoàn toàn dưới mã định danh tổ chức riêng của bạn. Đảm bảo an toàn 100%.
-                </p>
-              </div>
-
-              <div style={{ padding: '16px', backgroundColor: '#F4FAF5', borderRadius: 'var(--radius-md)', borderLeft: '4px solid var(--color-success)' }}>
-                <h4 style={{ fontWeight: 600, fontSize: '14px', color: 'var(--color-text-primary)', marginBottom: '4px' }}>
-                  Mẹo quản lý nhân sự
-                </h4>
-                <p style={{ fontSize: '12px', color: 'var(--color-text-secondary)' }}>
-                  Hãy cập nhật đầy đủ Ngày vào làm (Joined Date) của nhân viên mới để hệ thống tự động tính lũy kế ngày phép hàng tháng một cách chuẩn xác nhất.
-                </p>
-              </div>
-
-              <div style={{ marginTop: '8px' }}>
-                <h4 style={{ fontWeight: 600, fontSize: '13px', color: 'var(--color-text-primary)', marginBottom: '10px' }}>Hành động gợi ý:</h4>
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                  <button className="btn btn--secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                    <span>Cấu hình Tenant</span>
-                    <ArrowRight size={12} />
-                  </button>
-                  <button className="btn btn--secondary" style={{ padding: '6px 12px', fontSize: '12px' }}>
-                    <span>Xuất báo cáo PDF</span>
-                    <ArrowRight size={12} />
-                  </button>
-                </div>
+          <div className="card__body" style={{ height: 260, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie data={rateData} dataKey="value" innerRadius={60} outerRadius={85} startAngle={90} endAngle={-270}>
+                  <Cell fill="#28A745" /><Cell fill="#E9ECEF" />
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ marginTop: '-150px', textAlign: 'center', pointerEvents: 'none' }}>
+              <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--color-success)' }}>{rate}%</div>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>
+                {today.present ?? 0}/{today.total_active_employees ?? 0} nhân viên
               </div>
             </div>
           </div>
         </div>
-
       </div>
     </div>
   );

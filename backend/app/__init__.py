@@ -45,6 +45,10 @@ def create_app(config_name: str = None) -> Flask:
         # Tự động tạo bảng nếu chưa tồn tại (dev mode)
         db.create_all()
 
+        # Nâng cấp schema cho DB có sẵn (thêm cột mới, dọn bảng module đã gỡ)
+        from app.services.schema_upgrade import upgrade_schema
+        upgrade_schema()
+
         # Seed dữ liệu ban đầu (tenant + admin user)
         from app.seed import seed_initial_data
         seed_initial_data()
@@ -63,17 +67,35 @@ def create_app(config_name: str = None) -> Flask:
     app.register_blueprint(department_bp)
 
     from app.leave.routes import (
-        leave_type_bp, leave_policy_bp, leave_request_bp,
-        leave_balance_bp, attendance_bp
+        leave_type_bp, leave_policy_bp, leave_request_bp, leave_balance_bp
     )
     app.register_blueprint(leave_type_bp)
     app.register_blueprint(leave_policy_bp)
     app.register_blueprint(leave_request_bp)
     app.register_blueprint(leave_balance_bp)
+
+    from app.attendance.routes import attendance_bp, work_location_bp, work_shift_bp
     app.register_blueprint(attendance_bp)
+    app.register_blueprint(work_location_bp)
+    app.register_blueprint(work_shift_bp)
 
     from app.admin import admin_bp
     app.register_blueprint(admin_bp)
+
+    from app.reports import reports_bp
+    app.register_blueprint(reports_bp)
+
+    from app.compensation import compensation_bp
+    app.register_blueprint(compensation_bp)
+
+    from app.tenant import tenant_bp
+    app.register_blueprint(tenant_bp)
+
+    from app.super_admin import super_admin_bp
+    app.register_blueprint(super_admin_bp)
+
+    from app.holiday import holiday_bp
+    app.register_blueprint(holiday_bp)
 
     # ── Route kiểm tra sức khỏe (health check) ──────────────────────
     @app.route("/api/health")

@@ -11,3 +11,4 @@ cryptography==44.*
 bcrypt==4.2.*
 gunicorn==23.*
 python-dotenv==1.1.*
+reportlab==4.*

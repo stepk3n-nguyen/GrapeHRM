@@ -48,7 +48,27 @@ def seed_initial_data():
         db.session.add(admin)
         print("[SEED] Đã tạo tài khoản admin (mật khẩu: admin123)")
 
+    # ── Tài khoản Super Admin (quản lý các tenant) ──────────────────
+    superadmin = User.query.filter_by(username="superadmin", tenant_id=tenant.id).first()
+    if superadmin is None:
+        superadmin = User(
+            tenant_id=tenant.id,
+            username="superadmin",
+            email="super@grapecorp.com",
+            role="super_admin",
+            is_active=True,
+        )
+        superadmin.set_password("super123")
+        db.session.add(superadmin)
+        print("[SEED] Đã tạo tài khoản super_admin (mật khẩu: super123)")
+
     db.session.commit()
+
+    # ── TenantConfig mặc định cho tenant ────────────────────────────
+    from app.models.tenant_config import TenantConfig
+    if not TenantConfig.query.filter_by(tenant_id=tenant.id).first():
+        db.session.add(TenantConfig(tenant_id=tenant.id, plan="PRO", max_employees=100))
+        db.session.commit()
 
     # ── Seed Dữ liệu nghỉ phép cơ bản (Leave Types) ─────────────────
     from app.models.leave import LeaveType, LeavePolicy, LeavePolicyDetail
@@ -88,7 +108,52 @@ def seed_initial_data():
             entitlement = 12 if code == "ANNUAL" else (5 if code == "SICK" else (3 if code in ["WEDDING", "BEREAVEMENT"] else 0))
             detail = LeavePolicyDetail(policy_id=default_policy.id, leave_type_id=t_obj.id, entitlement=entitlement)
             db.session.add(detail)
-            
+
         print("[SEED] Đã tạo Leave Types và Policy mặc định")
+
+    db.session.commit()
+
+    # ── Seed Ca làm việc mặc định (cho chấm công) ───────────────────
+    from datetime import time
+    from app.models.work import WorkShift
+
+    default_shift = WorkShift.query.filter_by(tenant_id=tenant.id, is_default=True).first()
+    if not default_shift:
+        default_shift = WorkShift(
+            tenant_id=tenant.id,
+            name="Ca hành chính",
+            start_time=time(8, 30),
+            end_time=time(17, 30),
+            late_threshold_minutes=15,
+            break_minutes=60,
+            is_default=True,
+        )
+        db.session.add(default_shift)
+        print("[SEED] Đã tạo ca làm mặc định (08:30-17:30)")
+
+    db.session.commit()
+
+    # ── Seed Phụ cấp & Khấu trừ mặc định (cho bảng lương) ───────────
+    from app.models.compensation import SalaryAllowance, SalaryDeduction
+
+    if SalaryAllowance.query.filter_by(tenant_id=tenant.id).count() == 0:
+        for name, amt in [("Phụ cấp ăn trưa", 730000), ("Phụ cấp xăng xe", 300000)]:
+            db.session.add(SalaryAllowance(tenant_id=tenant.id, name=name, type="FIXED", default_amount=amt))
+        print("[SEED] Đã tạo phụ cấp mặc định")
+
+    if SalaryDeduction.query.filter_by(tenant_id=tenant.id).count() == 0:
+        for name, pct in [("BHXH (8%)", 8), ("BHYT (1.5%)", 1.5), ("BHTN (1%)", 1)]:
+            db.session.add(SalaryDeduction(tenant_id=tenant.id, name=name, type="PERCENT", default_amount=pct))
+        print("[SEED] Đã tạo khấu trừ mặc định")
+
+    db.session.commit()
+
+    # ── Seed Lịch ngày lễ VN cho tenant demo (mỗi tenant có lịch RIÊNG) ──
+    from app.models.holiday import Holiday
+    from app.services.vn_holidays import seed_vn_holidays_for_tenant
+
+    if Holiday.query.filter_by(tenant_id=tenant.id).count() == 0:
+        added, _ = seed_vn_holidays_for_tenant(tenant.id, 2026)
+        print(f"[SEED] Đã tạo {added} ngày lễ VN 2026 cho tenant demo")
 
     db.session.commit()

@@ -64,17 +64,3 @@ class LeaveApprovalLog(TimestampMixin, db.Model):
 
     request = db.relationship("LeaveRequest", backref=db.backref("approval_logs", cascade="all, delete-orphan"))
     approver = db.relationship("User")
-
-class Attendance(TenantMixin, TimestampMixin, db.Model):
-    __tablename__ = "attendance"
-    id = db.Column(db.Integer, primary_key=True)
-    employee_id = db.Column(db.Integer, db.ForeignKey('employees.id', ondelete='CASCADE'), nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    check_in = db.Column(db.Time)
-    check_out = db.Column(db.Time)
-    work_hours = db.Column(db.Numeric(4, 1))
-    status = db.Column(db.Enum('PRESENT', 'ABSENT', 'LATE', 'HALF_DAY', 'ON_LEAVE', name='attendance_status'), nullable=False)
-    note = db.Column(db.Text)
-    __table_args__ = (db.UniqueConstraint('employee_id', 'date'),)
-    
-    employee = db.relationship("Employee", backref=db.backref("attendances", cascade="all, delete-orphan"))

@@ -21,7 +21,7 @@ class Config:
     # Chuỗi kết nối database — PyMySQL driver cho MySQL 8
     SQLALCHEMY_DATABASE_URI = os.getenv(
         "DATABASE_URL",
-        "mysql+pymysql://root:root@localhost:3306/grapehrm"
+        "mysql+pymysql://root:123123123@localhost:3306/grapehrm"
     )
 
     # Tắt tính năng theo dõi thay đổi model (tốn bộ nhớ, không cần thiết)

@@ -160,26 +160,24 @@ def get_next_employee_id_route():
     if not tenant_id:
         return jsonify({"error": "Không xác định được Tenant ID"}), 403
 
+    # Lấy giá trị lớn nhất giữa sequence và mã NV thực tế trong DB.
+    # Việc quét DB giúp tự chữa lành khi sequence bị lệch (vd đã lỡ tạo NV-006
+    # nhưng sequence vẫn kẹt ở 5) — luôn trả về số chưa dùng tiếp theo.
     seq = EmployeeSequence.query.filter_by(tenant_id=tenant_id).first()
-    next_val = 1
-    if seq:
-        next_val = seq.current_value + 1
-    else:
-        # Nếu chưa có sequence, quét từ DB để lấy mã lớn nhất
-        employees = Employee.query.filter_by(tenant_id=tenant_id).all()
-        max_val = 0
-        for emp in employees:
-            if emp.employee_id and emp.employee_id.startswith("NV-"):
-                try:
-                    num_part = re.sub(r"\D", "", emp.employee_id)
-                    val = int(num_part) if num_part else 0
-                    if val > max_val:
-                        max_val = val
-                except ValueError:
-                    pass
-        next_val = max_val + 1
+    max_val = seq.current_value if seq else 0
 
-    return jsonify({"next_id": f"NV-{next_val:03d}"}), 200
+    employees = Employee.query.filter_by(tenant_id=tenant_id).all()
+    for emp in employees:
+        if emp.employee_id and emp.employee_id.startswith("NV-"):
+            try:
+                num_part = re.sub(r"\D", "", emp.employee_id)
+                val = int(num_part) if num_part else 0
+                if val > max_val:
+                    max_val = val
+            except ValueError:
+                pass
+
+    return jsonify({"next_id": f"NV-{max_val + 1:03d}"}), 200
 
 
 @employee_bp.route("", methods=["POST"])
@@ -211,6 +209,18 @@ def create_employee():
         # Chặn trùng mã nhân viên trong cùng tenant
         if Employee.query.filter_by(tenant_id=tenant_id, employee_id=employee_id).first():
             return jsonify({"error": f"Mã nhân viên {employee_id} đã tồn tại"}), 400
+        # Đồng bộ sequence khi mã được truyền vào (vd frontend điền sẵn NV-006),
+        # để lần sinh tiếp theo không bị lặp lại cùng một số.
+        m = re.match(r"^NV-0*(\d+)$", employee_id)
+        if m:
+            val = int(m.group(1))
+            seq = EmployeeSequence.query.filter_by(tenant_id=tenant_id).first()
+            if not seq:
+                seq = EmployeeSequence(tenant_id=tenant_id, current_value=0)
+                db.session.add(seq)
+            if val > seq.current_value:
+                seq.current_value = val
+                db.session.add(seq)
     gender = data.get("gender")
     if gender is not None:
         try:

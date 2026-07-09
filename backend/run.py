@@ -3,7 +3,13 @@ Entry point — khởi chạy Flask app.
 Chạy trực tiếp: python run.py  (hoặc: flask run)
 """
 
+import os
 import sys
+
+from dotenv import load_dotenv
+
+# Nạp backend/.env trước khi import app (config đọc os.getenv)
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 # Console Windows mặc định cp1252 → các print tiếng Việt sẽ crash.
 # Ép stdout/stderr sang UTF-8 ngay từ đầu (an toàn cả khi đã là UTF-8).

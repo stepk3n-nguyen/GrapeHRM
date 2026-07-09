@@ -4,6 +4,8 @@ Model Employee — hồ sơ nhân viên chính.
 liên hệ và công việc của nhân viên. Phase 1 chỉ tạo các cột cơ bản.
 """
 
+from sqlalchemy.dialects.mysql import LONGTEXT
+
 from app.extensions import db
 from app.models.base import TenantMixin, TimestampMixin
 
@@ -49,8 +51,11 @@ class Employee(TenantMixin, TimestampMixin, db.Model):
         default="ACTIVE",
     )
 
-    # Ảnh đại diện
-    profile_pic_url = db.Column(db.Text, nullable=True)
+    # Ảnh đại diện — có thể là base64 data URI (rất dài), nên dùng LONGTEXT trên MySQL.
+    # TEXT (64KB) không đủ chứa ảnh base64 → gây lỗi "Data too long".
+    profile_pic_url = db.Column(
+        db.Text().with_variant(LONGTEXT, "mysql"), nullable=True
+    )
 
     # Chức vụ (Job Title)
     title_id = db.Column(

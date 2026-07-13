@@ -5,17 +5,7 @@ import {
   CalendarDays, CalendarPlus
 } from 'lucide-react';
 
-const getCurrentPosition = () =>
-  new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Trình duyệt không hỗ trợ định vị'));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      (err) => reject(err),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
-
-const emptyLoc = { name: '', latitude: '', longitude: '', radius_meters: 200, is_active: true };
+const emptyLoc = { name: '', is_active: true, allowed_ips: '' };
 const emptyShift = { name: '', start_time: '08:30', end_time: '17:30', late_threshold_minutes: 15, break_minutes: 60, is_default: false };
 const currentYear = new Date().getFullYear();
 const emptyHoliday = { name: '', date: '', is_paid: true, is_recurring: false };
@@ -40,7 +30,6 @@ const WorkConfigPage = () => {
   const [locModal, setLocModal] = useState(null); // null | {form, id?}
   const [shiftModal, setShiftModal] = useState(null);
   const [holidayModal, setHolidayModal] = useState(null);
-  const [geoLoading, setGeoLoading] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -69,33 +58,14 @@ const WorkConfigPage = () => {
   useEffect(() => { fetchHolidays(holidayYear); /* eslint-disable-next-line */ }, [holidayYear]);
 
   // ── Địa điểm ────────────────────────────────────────────────
-  const fillCurrentLocation = async () => {
-    setGeoLoading(true);
-    try {
-      const { latitude, longitude } = await getCurrentPosition();
-      setLocModal((m) => ({ ...m, form: { ...m.form, latitude: latitude.toFixed(6), longitude: longitude.toFixed(6) } }));
-      showToast('Đã lấy toạ độ hiện tại.');
-    } catch (e) {
-      showToast(e.message || 'Không lấy được vị trí.', 'error');
-    } finally {
-      setGeoLoading(false);
-    }
-  };
-
   const saveLocation = async (e) => {
     e.preventDefault();
     const { form, id } = locModal;
     const payload = {
       name: form.name,
-      latitude: parseFloat(form.latitude),
-      longitude: parseFloat(form.longitude),
-      radius_meters: parseInt(form.radius_meters, 10),
       is_active: form.is_active,
+      allowed_ips: form.allowed_ips || '',
     };
-    if (Number.isNaN(payload.latitude) || Number.isNaN(payload.longitude)) {
-      showToast('Toạ độ không hợp lệ.', 'error');
-      return;
-    }
     const url = id ? `/api/work-locations/${id}` : '/api/work-locations';
     const res = await fetch(url, { method: id ? 'PUT' : 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
     const data = await res.json();
@@ -213,14 +183,12 @@ const WorkConfigPage = () => {
           <div className="card__body" style={{ padding: 0 }}>
             <div className="table-responsive">
               <table className="table table--zebra">
-                <thead><tr><th>Tên</th><th>Vĩ độ</th><th>Kinh độ</th><th>Bán kính</th><th>Trạng thái</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>
+                <thead><tr><th>Tên</th><th>IP cho phép</th><th>Trạng thái</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>
                 <tbody>
                   {locations.map((l) => (
                     <tr key={l.id}>
                       <td style={{ fontWeight: 600 }}>{l.name}</td>
-                      <td>{l.latitude}</td>
-                      <td>{l.longitude}</td>
-                      <td>{l.radius_meters} m</td>
+                      <td><code style={{ fontSize: '12px' }}>{l.allowed_ips || '—'}</code></td>
                       <td>{l.is_active ? <span className="status-badge status-badge--approved">Bật</span> : <span className="status-badge status-badge--rejected">Tắt</span>}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button className="btn btn--secondary" style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }} onClick={() => setLocModal({ id: l.id, form: { ...l } })}><Pencil size={13} /></button>
@@ -228,7 +196,7 @@ const WorkConfigPage = () => {
                       </td>
                     </tr>
                   ))}
-                  {locations.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>Chưa có địa điểm nào. Nhân viên sẽ không chấm công được cho tới khi bạn thêm ít nhất 1 địa điểm.</td></tr>}
+                  {locations.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>Chưa có địa điểm nào. Nhân viên sẽ không chấm công được cho tới khi bạn thêm ít nhất 1 địa điểm.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -321,22 +289,12 @@ const WorkConfigPage = () => {
                   <label className="form-label form-label--required">Tên địa điểm</label>
                   <input className="input" value={locModal.form.name} onChange={(e) => setLocModal({ ...locModal, form: { ...locModal.form, name: e.target.value } })} required />
                 </div>
-                <button type="button" className="btn btn--secondary" style={{ marginBottom: '12px' }} onClick={fillCurrentLocation} disabled={geoLoading}>
-                  {geoLoading ? <Loader2 size={14} className="animate-spin" /> : <Crosshair size={14} />} Lấy vị trí hiện tại
-                </button>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-                  <div className="form-group">
-                    <label className="form-label form-label--required">Vĩ độ (lat)</label>
-                    <input className="input" value={locModal.form.latitude} onChange={(e) => setLocModal({ ...locModal, form: { ...locModal.form, latitude: e.target.value } })} required />
-                  </div>
-                  <div className="form-group">
-                    <label className="form-label form-label--required">Kinh độ (lng)</label>
-                    <input className="input" value={locModal.form.longitude} onChange={(e) => setLocModal({ ...locModal, form: { ...locModal.form, longitude: e.target.value } })} required />
-                  </div>
-                </div>
                 <div className="form-group">
-                  <label className="form-label">Bán kính cho phép (mét)</label>
-                  <input type="number" min="10" className="input" value={locModal.form.radius_meters} onChange={(e) => setLocModal({ ...locModal, form: { ...locModal.form, radius_meters: e.target.value } })} />
+                  <label className="form-label">IP cho phép (Public IP văn phòng)</label>
+                  <input className="input" value={locModal.form.allowed_ips || ''} onChange={(e) => setLocModal({ ...locModal, form: { ...locModal.form, allowed_ips: e.target.value } })} placeholder="vd: 113.23.45.67, 113.23.45.68" />
+                  <small style={{ color: 'var(--color-text-muted)', fontSize: '11px', display: 'block', marginTop: '4px' }}>
+                    Nhiều IP cách nhau bằng dấu phẩy. Để trống nếu chỉ dùng định vị.
+                  </small>
                 </div>
                 <label style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '14px' }}>
                   <input type="checkbox" checked={locModal.form.is_active} onChange={(e) => setLocModal({ ...locModal, form: { ...locModal.form, is_active: e.target.checked } })} />

@@ -17,17 +17,15 @@ class WorkLocation(TenantMixin, TimestampMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(150), nullable=False)
 
-    # Toạ độ tâm điểm (vĩ độ / kinh độ)
-    latitude = db.Column(db.Numeric(9, 6), nullable=False)
-    longitude = db.Column(db.Numeric(9, 6), nullable=False)
-
-    # Bán kính cho phép chấm công (mét)
-    radius_meters = db.Column(db.Integer, nullable=False, default=200)
-
     is_active = db.Column(db.Boolean, default=True)
 
+    # Danh sách IP Public cho phép chấm công (phân cách bằng dấu phẩy)
+    # Ví dụ: "113.23.45.67,113.23.45.68"
+    # Nếu để trống → chỉ dùng GPS geofence
+    allowed_ips = db.Column(db.Text, nullable=True)
+
     def __repr__(self):
-        return f"<WorkLocation {self.name} r={self.radius_meters}m>"
+        return f"<WorkLocation {self.name}>"
 
 
 class WorkShift(TenantMixin, TimestampMixin, db.Model):

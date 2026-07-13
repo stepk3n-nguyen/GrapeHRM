@@ -72,8 +72,7 @@ def _serialize_attendance(r):
         "early_minutes": r.early_minutes or 0,
         "note": r.note,
         "source": r.source,
-        "is_within_geofence": r.is_within_geofence,
-        "check_in_distance_m": r.check_in_distance_m,
+        "ip_verified": r.ip_verified,
     }
 
 
@@ -206,7 +205,27 @@ def delete_attendance(att_id):
     return jsonify({"message": "Đã xóa"}), 200
 
 
-# ── 2. NHÂN VIÊN TỰ CHẤM CÔNG (GEOFENCE) ────────────────────────────────
+# ── 2. NHÂN VIÊN TỰ CHẤM CÔNG (IP WHITELIST) ────────────────────────────
+
+def _get_client_ip():
+    """Lấy IP thực của client (ưu tiên X-Forwarded-For nếu sau reverse proxy)."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.remote_addr
+
+
+def _check_ip_whitelist(client_ip):
+    """Kiểm tra IP client có nằm trong whitelist của bất kỳ địa điểm nào không.
+    Trả về (True, location) nếu khớp, (False, None) nếu không."""
+    locations = WorkLocation.query.filter_by(tenant_id=g.tenant_id, is_active=True).all()
+    for loc in locations:
+        if loc.allowed_ips:
+            ip_list = [ip.strip() for ip in loc.allowed_ips.split(",") if ip.strip()]
+            if client_ip in ip_list:
+                return True, loc
+    return False, None
+
 
 @attendance_bp.route("/today", methods=["GET"])
 @jwt_required()
@@ -218,6 +237,8 @@ def attendance_today():
     att = Attendance.query.filter_by(employee_id=emp.id, date=date.today()).first()
     has_location = WorkLocation.query.filter_by(tenant_id=g.tenant_id, is_active=True).count() > 0
     shift = svc.resolve_shift(emp)
+    client_ip = _get_client_ip()
+    ip_ok, _ = _check_ip_whitelist(client_ip)
     return jsonify({
         "has_work_location": has_location,
         "shift": {
@@ -225,22 +246,9 @@ def attendance_today():
             "start_time": _fmt_time(shift.start_time), "end_time": _fmt_time(shift.end_time),
         } if shift else None,
         "attendance": _serialize_attendance(att) if att else None,
+        "client_ip": client_ip,
+        "ip_match": ip_ok,
     }), 200
-
-
-def _resolve_geofence(lat, lng):
-    if lat is None or lng is None:
-        return False, None, None, (jsonify({"error": "Thiếu toạ độ vị trí"}), 400)
-    locations = WorkLocation.query.filter_by(tenant_id=g.tenant_id, is_active=True).all()
-    if not locations:
-        return False, None, None, (jsonify({"error": "Công ty chưa cấu hình địa điểm làm việc. Liên hệ quản trị viên."}), 400)
-    loc, dist = nearest_location(locations, lat, lng)
-    if dist > loc.radius_meters:
-        return False, loc, dist, (jsonify({
-            "error": f"Bạn đang ngoài phạm vi công ty (cách {int(dist)}m, cho phép {loc.radius_meters}m).",
-            "distance_m": int(dist),
-        }), 403)
-    return True, loc, dist, None
 
 
 @attendance_bp.route("/check-in", methods=["POST"])
@@ -250,11 +258,14 @@ def self_check_in():
     if not emp:
         return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
 
-    data = request.get_json(silent=True) or {}
-    lat, lng = data.get("latitude"), data.get("longitude")
-    ok, loc, dist, err = _resolve_geofence(lat, lng)
-    if not ok:
-        return err
+    # ── Xác thực bằng IP mạng văn phòng ──
+    client_ip = _get_client_ip()
+    ip_ok, loc = _check_ip_whitelist(client_ip)
+    if not ip_ok:
+        return jsonify({
+            "error": f"IP của bạn ({client_ip}) không nằm trong mạng văn phòng. Hãy kết nối Wi-Fi/mạng LAN công ty để chấm công.",
+            "client_ip": client_ip,
+        }), 403
 
     today = date.today()
     att = Attendance.query.filter_by(employee_id=emp.id, date=today).first()
@@ -270,13 +281,12 @@ def self_check_in():
         db.session.add(att)
 
     att.check_in = now.time()
-    att.check_in_lat = lat
-    att.check_in_lng = lng
-    att.check_in_distance_m = int(dist)
     att.is_within_geofence = True
+    att.ip_verified = True
     att.source = "SELF"
     att.status = status
     att.late_minutes = max(late_minutes, 0) if status == "LATE" else 0
+    data = request.get_json(silent=True) or {}
     att.note = data.get("note") or att.note
     db.session.commit()
 
@@ -293,11 +303,14 @@ def self_check_out():
     if not emp:
         return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
 
-    data = request.get_json(silent=True) or {}
-    lat, lng = data.get("latitude"), data.get("longitude")
-    ok, loc, dist, err = _resolve_geofence(lat, lng)
-    if not ok:
-        return err
+    # ── Xác thực bằng IP mạng văn phòng ──
+    client_ip = _get_client_ip()
+    ip_ok, loc = _check_ip_whitelist(client_ip)
+    if not ip_ok:
+        return jsonify({
+            "error": f"IP của bạn ({client_ip}) không nằm trong mạng văn phòng. Hãy kết nối Wi-Fi/mạng LAN công ty để chấm công.",
+            "client_ip": client_ip,
+        }), 403
 
     att = Attendance.query.filter_by(employee_id=emp.id, date=date.today()).first()
     if not att or not att.check_in:
@@ -307,8 +320,7 @@ def self_check_out():
 
     shift = svc.resolve_shift(emp)
     svc.apply_check_out(att, shift, datetime.now())
-    att.check_out_lat = lat
-    att.check_out_lng = lng
+    data = request.get_json(silent=True) or {}
     att.note = data.get("note") or att.note
     db.session.commit()
 
@@ -427,10 +439,8 @@ def get_work_locations():
     return jsonify([{
         "id": l.id,
         "name": l.name,
-        "latitude": float(l.latitude),
-        "longitude": float(l.longitude),
-        "radius_meters": l.radius_meters,
         "is_active": l.is_active,
+        "allowed_ips": l.allowed_ips or "",
     } for l in locs]), 200
 
 
@@ -440,15 +450,13 @@ def create_work_location():
     if not check_hr_admin():
         return jsonify({"error": "Không có quyền"}), 403
     data = request.get_json(silent=True) or {}
-    if not data.get("name") or data.get("latitude") is None or data.get("longitude") is None:
-        return jsonify({"error": "Thiếu tên hoặc toạ độ"}), 400
+    if not data.get("name"):
+        return jsonify({"error": "Thiếu tên địa điểm"}), 400
     loc = WorkLocation(
         tenant_id=g.tenant_id,
         name=data["name"],
-        latitude=data["latitude"],
-        longitude=data["longitude"],
-        radius_meters=int(data.get("radius_meters", 200)),
         is_active=data.get("is_active", True),
+        allowed_ips=data.get("allowed_ips") or None,
     )
     db.session.add(loc)
     db.session.commit()
@@ -464,7 +472,7 @@ def update_work_location(loc_id):
     if not loc:
         return jsonify({"error": "Không tìm thấy"}), 404
     data = request.get_json(silent=True) or {}
-    for f in ["name", "latitude", "longitude", "radius_meters", "is_active"]:
+    for f in ["name", "is_active", "allowed_ips"]:
         if f in data:
             setattr(loc, f, data[f])
     db.session.commit()

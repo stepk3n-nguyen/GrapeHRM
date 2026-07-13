@@ -37,14 +37,8 @@ class Attendance(TenantMixin, TimestampMixin, db.Model):
     late_minutes = db.Column(db.Integer, nullable=False, default=0)
     early_minutes = db.Column(db.Integer, nullable=False, default=0)
 
-    # ── Geofence (toạ độ lúc chấm vào/ra) ───────────────────────────────
-    check_in_lat = db.Column(db.Numeric(9, 6))
-    check_in_lng = db.Column(db.Numeric(9, 6))
-    check_out_lat = db.Column(db.Numeric(9, 6))
-    check_out_lng = db.Column(db.Numeric(9, 6))
-    # Khoảng cách (m) từ vị trí chấm vào tới địa điểm công ty gần nhất
-    check_in_distance_m = db.Column(db.Integer)
-    is_within_geofence = db.Column(db.Boolean)
+    # True nếu chấm công được xác thực bằng IP whitelist
+    ip_verified = db.Column(db.Boolean, default=False)
     # Nguồn dữ liệu: nhân viên tự chấm (SELF) hay HR nhập tay (MANUAL)
     source = db.Column(db.Enum('SELF', 'MANUAL', name='attendance_source'), default='MANUAL')
 

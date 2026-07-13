@@ -2,18 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import {
   Download, Plus, Loader2, CheckCircle, MapPin, LogIn, LogOut,
-  Pencil, Trash2, ShieldCheck, AlertTriangle, Table2, ListChecks
+  Pencil, Trash2, ShieldCheck, AlertTriangle, Table2, ListChecks, Wifi
 } from 'lucide-react';
 
-const getCurrentPosition = () =>
-  new Promise((resolve, reject) => {
-    if (!navigator.geolocation) return reject(new Error('Trình duyệt không hỗ trợ định vị'));
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      () => reject(new Error('Không lấy được vị trí. Hãy cho phép quyền định vị.')),
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
-  });
+
 
 const STATUS_OPTS = [
   ['', 'Tự xác định theo ca'], ['PRESENT', 'Có mặt'], ['ABSENT', 'Vắng mặt'],
@@ -41,6 +33,8 @@ const AttendancePage = () => {
   // ── Tự chấm công ──────────────────────────────────────────────
   const [today, setToday] = useState(null);
   const [hasLocation, setHasLocation] = useState(true);
+  const [ipMatch, setIpMatch] = useState(false);
+  const [clientIp, setClientIp] = useState('');
   const [punching, setPunching] = useState(false);
 
   const [toasts, setToasts] = useState([]);
@@ -90,6 +84,8 @@ const AttendancePage = () => {
         const data = await res.json();
         setToday(data.attendance);
         setHasLocation(data.has_work_location);
+        setIpMatch(data.ip_match);
+        setClientIp(data.client_ip || '');
       }
     } catch (err) { console.error(err); }
   };
@@ -104,20 +100,20 @@ const AttendancePage = () => {
   const punch = async (kind) => {
     setPunching(true);
     try {
-      const coords = await getCurrentPosition();
       const res = await fetch(`/api/attendance/${kind}`, {
-        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(coords),
+        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}),
       });
       const data = await res.json();
       if (res.ok) {
         showToast(data.message);
         setToday(data.attendance);
         fetchAttendance();
+        fetchToday();
       } else {
         showToast(data.error || 'Chấm công thất bại.', 'error');
       }
     } catch (e) {
-      showToast(e.message || 'Lỗi định vị.', 'error');
+      showToast(e.message || 'Lỗi kết nối.', 'error');
     } finally {
       setPunching(false);
     }
@@ -228,6 +224,18 @@ const AttendancePage = () => {
                 <span>Công ty chưa cấu hình địa điểm làm việc — chưa thể chấm công. Liên hệ quản trị viên.</span>
               </div>
             )}
+            {hasLocation && !ipMatch && (
+              <div className="alert alert--error" style={{ marginBottom: '12px' }}>
+                <Wifi size={16} />
+                <span>IP của bạn (<b>{clientIp}</b>) không nằm trong mạng văn phòng. Hãy kết nối Wi-Fi/mạng LAN công ty để chấm công.</span>
+              </div>
+            )}
+            {hasLocation && ipMatch && (
+              <div className="alert alert--success" style={{ marginBottom: '12px' }}>
+                <ShieldCheck size={16} />
+                <span>IP của bạn (<b>{clientIp}</b>) đã được xác thực — mạng văn phòng hợp lệ.</span>
+              </div>
+            )}
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '24px' }}>
               <div style={{ display: 'flex', gap: '32px' }}>
                 <div>
@@ -242,11 +250,11 @@ const AttendancePage = () => {
                   <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Trạng thái</div>
                   <div style={{ marginTop: '4px' }}>{today ? renderStatus(today.status) : <span style={{ color: 'var(--color-text-muted)' }}>Chưa chấm</span>}</div>
                 </div>
-                {today?.is_within_geofence && (
+                {today?.ip_verified && (
                   <div>
-                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Vị trí</div>
-                    <div style={{ marginTop: '4px', color: 'var(--color-success)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 600 }}>
-                      <ShieldCheck size={15} /> Trong phạm vi {today.check_in_distance_m != null ? `(${today.check_in_distance_m}m)` : ''}
+                    <div style={{ fontSize: '12px', color: 'var(--color-text-muted)' }}>Xác thực</div>
+                    <div style={{ marginTop: '4px', color: 'var(--color-primary)', display: 'flex', alignItems: 'center', gap: '4px', fontSize: '13px', fontWeight: 600 }}>
+                      <ShieldCheck size={15} /> IP văn phòng
                     </div>
                   </div>
                 )}

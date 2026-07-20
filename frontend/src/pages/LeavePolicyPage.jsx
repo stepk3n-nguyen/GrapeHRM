@@ -164,7 +164,7 @@ const LeavePolicyPage = () => {
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
         <div>
-          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Quản trị hệ thống Phép</h2>
+          <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Quản trị hệ thống Nghỉ phép</h2>
           <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '4px' }}>
             Thiết lập loại phép và gán chính sách phép cho nhân sự.
           </p>

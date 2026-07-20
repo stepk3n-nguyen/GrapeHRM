@@ -175,6 +175,12 @@ const LeavePage = () => {
     }
   };
 
+  const getLocalDateStr = () => {
+    const d = new Date();
+    const tzOffset = d.getTimezoneOffset() * 60000;
+    return new Date(d.getTime() - tzOffset).toISOString().split('T')[0];
+  };
+
   return (
     <div className="fade-in">
       <div className="toast-container">
@@ -331,10 +337,14 @@ const LeavePage = () => {
                         <td>{req.total_days}</td>
                         <td>{renderStatus(req.status)}</td>
                         <td style={{ textAlign: 'right' }}>
-                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                            <button className="btn btn--icon" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(req.id)} title="Duyệt">
-                              <Check size={16} />
-                            </button>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', alignItems: 'center' }}>
+                            {req.end_date < getLocalDateStr() && !isAdmin ? (
+                              <span style={{ fontSize: '13px', color: 'var(--color-error)', fontWeight: 500, marginRight: '8px' }}>Quá hạn</span>
+                            ) : (
+                              <button className="btn btn--icon" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(req.id)} title="Duyệt">
+                                <Check size={16} />
+                              </button>
+                            )}
                             <button className="btn btn--icon" style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={() => handleReject(req.id)} title="Từ chối">
                               <XIcon size={16} />
                             </button>
@@ -375,11 +385,11 @@ const LeavePage = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group">
                     <label className="form-label form-label--required">Từ ngày</label>
-                    <input type="date" className="input" value={formData.start_date} onChange={e => setFormData({...formData, start_date: e.target.value})} required />
+                    <input type="date" className="input" value={formData.start_date} onChange={e => setFormData({...formData, start_date: e.target.value})} min={getLocalDateStr()} required />
                   </div>
                   <div className="form-group">
                     <label className="form-label form-label--required">Đến ngày</label>
-                    <input type="date" className="input" value={formData.end_date} onChange={e => setFormData({...formData, end_date: e.target.value})} required />
+                    <input type="date" className="input" value={formData.end_date} onChange={e => setFormData({...formData, end_date: e.target.value})} min={formData.start_date || getLocalDateStr()} required />
                   </div>
                 </div>
                 <div className="form-group">

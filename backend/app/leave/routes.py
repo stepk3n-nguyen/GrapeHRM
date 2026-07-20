@@ -4,7 +4,7 @@ Bao gồm: Loại nghỉ phép, Chính sách, Đơn nghỉ phép, Số dư phép
 (Chấm công / ca làm việc / địa điểm đã tách sang app/attendance/routes.py)
 """
 
-from datetime import datetime, date, timedelta
+from datetime import datetime, date, timedelta, timezone
 from flask import Blueprint, request, jsonify, g, current_app
 from flask_jwt_extended import jwt_required, get_jwt, get_jwt_identity
 from sqlalchemy import extract
@@ -321,6 +321,10 @@ def create_request():
     if start_d > end_d:
         return jsonify({"error": "Ngày bắt đầu phải trước hoặc bằng ngày kết thúc"}), 400
 
+    # Chặn xin nghỉ cho ngày đã qua — chỉ được xin từ hôm nay trở đi
+    if start_d < date.today():
+        return jsonify({"error": "Ngày bắt đầu nghỉ phải từ hôm nay trở đi"}), 400
+
     # 4) Server TỰ TÍNH số ngày nghỉ (loại T7/CN) — không tin total_days từ client
     half_day = bool(data.get("half_day"))
     total_days = _count_working_days(start_d, end_d, half_day)
@@ -402,6 +406,7 @@ def create_request():
 @jwt_required()
 def get_requests():
     tenant_id = g.tenant_id
+    
     claims = get_jwt()
     role = claims.get("role")
     
@@ -438,7 +443,7 @@ def get_requests():
             "end_date": r.end_date.isoformat(),
             "total_days": float(r.total_days),
             "status": r.status,
-            "created_at": r.created_at.isoformat()
+            "created_at": r.created_at.replace(tzinfo=timezone.utc).isoformat() if r.created_at else None
         })
     return jsonify(res), 200
 
@@ -456,6 +461,9 @@ def approve_request(req_id):
     data = request.get_json(silent=True) or {}
     comment = data.get("comment", "")
     
+    if req.end_date < date.today() and role not in ["admin", "super_admin"]:
+        return jsonify({"error": "Đơn đã quá hạn duyệt (chỉ Admin/Super Admin mới có quyền duyệt)"}), 400
+        
     if req.status == "PENDING_HR" and role in ["hr_manager", "admin", "super_admin"]:
         req.status = "APPROVED"
         log = LeaveApprovalLog(request_id=req.id, approver_id=user_id, action="APPROVED", comment=comment)

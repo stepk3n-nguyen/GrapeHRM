@@ -1,18 +1,18 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Users, CalendarDays, Clock, Clock4, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2 } from 'lucide-react';
+import { LayoutDashboard, User, Users, CalendarDays, Clock, Clock4, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onCloseSidebar }) => {
   const { user } = useAuth();
-  
+
   const isAdminOrHR = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr_manager';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   const menuItems = [
     ...(user?.role === 'super_admin' ? [{ name: 'Quản lý Tổ chức', path: '/super-admin', icon: Building2 }] : []),
     ...(isAdminOrHR ? [{ name: 'Dashboard', path: '/', icon: LayoutDashboard }] : []),
-    { name: 'Thông tin cá nhân', path: '/profile', icon: Users },
+    { name: 'Thông tin cá nhân', path: '/profile', icon: User },
     ...(isAdminOrHR ? [{ name: 'Quản lý nhân viên', path: '/employees', icon: Users }] : []),
     { name: 'Nghỉ phép', path: '/leave', icon: CalendarDays },
     { name: 'Chấm công', path: '/attendance', icon: Clock },
@@ -49,7 +49,7 @@ const Sidebar = ({ isOpen, onCloseSidebar }) => {
                 <NavLink
                   to={item.path}
                   onClick={handleLinkClick}
-                  className={({ isActive }) => 
+                  className={({ isActive }) =>
                     `sidebar__link ${isActive ? 'sidebar__link--active' : ''}`
                   }
                   end={item.path === '/'}

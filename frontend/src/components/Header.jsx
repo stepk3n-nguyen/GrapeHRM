@@ -20,7 +20,6 @@ const Header = ({ onToggleSidebar }) => {
         <div className="header__logo" style={{ justifyContent: 'flex-start', background: 'transparent', padding: 0 }}>
           <img src={logoIcon} alt="G" style={{ width: '800%', height: '100%', objectFit: 'contain' }} />
         </div>
-        {/* <h1 className="header__title">GrapeHRM</h1> */}
       </div>
 
       <div className="header__nav">

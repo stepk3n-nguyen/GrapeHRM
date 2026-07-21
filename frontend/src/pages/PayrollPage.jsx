@@ -158,7 +158,7 @@ const PayrollPage = () => {
               })()}
 
               <div className="table-responsive">
-                <table className="table payroll-detail-table" style={{ fontVariantNumeric: 'tabular-nums' }}>
+                <table className="table payroll-detail-table" style={{ fontVariantNumeric: 'tabular-nums', minWidth: 900 }}>
                   <thead>
                     <tr>
                       <th style={{ position: 'sticky', top: 0, background: 'var(--color-surface, #fff)' }}>Nhân viên</th>

@@ -94,7 +94,7 @@ npm install
 npm run dev                    # http://localhost:5173
 ```
 
-Cấu hình kết nối MySQL ở `backend/app/config.py` (mặc định `root:123123123@localhost:3306/grapehrm`)
+Cấu hình kết nối MySQL ở `backend/app/config.py` (mặc định `root:12312312@localhost:3306/grapehrm`)
 hoặc qua biến môi trường `DATABASE_URL`.
 
 ---

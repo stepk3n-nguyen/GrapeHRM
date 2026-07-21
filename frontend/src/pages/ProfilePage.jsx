@@ -143,7 +143,7 @@ const ProfilePage = () => {
       </div>
 
       {profile ? (
-        <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px auto' }}>
+        <div className="card card--no-hover" style={{ maxWidth: '800px', margin: '0 auto 24px auto' }}>
           <div className="card__header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-start', gap: '24px', padding: '24px' }}>
             <div style={{
               width: '80px', height: '80px', borderRadius: '50%',
@@ -184,7 +184,7 @@ const ProfilePage = () => {
           </div>
         </div>
       ) : (
-        <div className="card" style={{ maxWidth: '800px', margin: '0 auto 24px auto' }}>
+        <div className="card card--no-hover" style={{ maxWidth: '800px', margin: '0 auto 24px auto' }}>
           <div className="card__body" style={{ display: 'flex', alignItems: 'center', gap: '12px', color: 'var(--color-text-muted)' }}>
             <ShieldAlert size={20} />
             <span>Tài khoản này chưa được liên kết với hồ sơ nhân viên. Bạn vẫn có thể đổi mật khẩu bên dưới.</span>
@@ -193,7 +193,7 @@ const ProfilePage = () => {
       )}
 
       {/* ── Đổi mật khẩu ─────────────────────────────────────────── */}
-      <div className="card" style={{ maxWidth: '800px', margin: '0 auto' }}>
+      <div className="card card--no-hover" style={{ maxWidth: '800px', margin: '0 auto' }}>
         <div className="card__header">
           <h3 className="card__title"><KeyRound size={18} /><span>Đổi mật khẩu</span></h3>
         </div>

@@ -404,7 +404,7 @@ const EmployeePage = () => {
         </div>
       </div>
 
-      <div className="card" style={{ marginBottom: '20px' }}>
+      <div className="card card--no-hover" style={{ marginBottom: '20px' }}>
         <div className="card__body" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '400px', position: 'relative' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', color: 'var(--color-text-muted)' }} />

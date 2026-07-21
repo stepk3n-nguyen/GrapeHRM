@@ -1,4 +1,5 @@
-import React, { createContext, useState, useEffect, useContext } from 'react';
+import React, { createContext, useState, useEffect, useContext, useRef, useCallback } from 'react';
+import { createAuthFetch } from '../utils/authFetch';
 
 const AuthContext = createContext(null);
 
@@ -7,22 +8,48 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('access_token'));
   const [loading, setLoading] = useState(true);
 
+  // Keep a stable ref to the current token for the authFetch wrapper
+  const tokenRef = useRef(token);
+  useEffect(() => {
+    tokenRef.current = token;
+  }, [token]);
+
+  const logout = useCallback(() => {
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setToken(null);
+    setUser(null);
+  }, []);
+
+  const updateToken = useCallback((newToken) => {
+    setToken(newToken);
+  }, []);
+
+  // Create the stable authFetch instance
+  const authFetchRef = useRef(null);
+  if (!authFetchRef.current) {
+    authFetchRef.current = createAuthFetch(
+      () => tokenRef.current,
+      updateToken,
+      logout
+    );
+  }
+
+  const authFetch = useCallback((url, options) => {
+    return authFetchRef.current(url, options);
+  }, []);
+
   // Hàm khôi phục thông tin user từ JWT đang lưu
   const checkSession = async (accessToken) => {
     try {
-      const response = await fetch('/api/auth/me', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      // Use authFetch here so it can auto-refresh if the token is already expired
+      const response = await authFetch('/api/auth/me');
 
       if (response.ok) {
         const userData = await response.json();
         setUser(userData);
       } else {
-        // Token không hợp lệ hoặc hết hạn
+        // Token không hợp lệ hoặc hết hạn và refresh thất bại
         logout();
       }
     } catch (err) {
@@ -34,6 +61,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Đồng bộ token real-time giữa các tab
   useEffect(() => {
     const savedToken = localStorage.getItem('access_token');
     if (savedToken) {
@@ -42,6 +70,25 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false);
     }
+
+    // Lắng nghe sự thay đổi của localStorage từ các tab khác
+    const handleStorageChange = (e) => {
+      if (e.key === 'access_token') {
+        const newToken = e.newValue;
+        if (newToken) {
+          // Có người đăng nhập ở tab khác (hoặc đổi tài khoản)
+          setToken(newToken);
+          checkSession(newToken);
+        } else {
+          // Tab khác đã đăng xuất
+          setToken(null);
+          setUser(null);
+        }
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
   const login = async (username, password, tenantSlug) => {
@@ -71,23 +118,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    setToken(null);
-    setUser(null);
-  };
-
-  // Trả về custom headers tiện dụng cho các request API tiếp theo
-  const getAuthHeaders = () => {
+  // Trả về custom headers tiện dụng cho các request API tiếp theo (Deprecated)
+  const getAuthHeaders = useCallback(() => {
     return {
       'Authorization': `Bearer ${token}`,
       'Content-Type': 'application/json',
     };
-  };
+  }, [token]);
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout, getAuthHeaders }}>
+    <AuthContext.Provider value={{ user, token, loading, login, logout, getAuthHeaders, authFetch }}>
       {children}
     </AuthContext.Provider>
   );

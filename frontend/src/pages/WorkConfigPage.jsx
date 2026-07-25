@@ -11,7 +11,7 @@ const currentYear = new Date().getFullYear();
 const emptyHoliday = { name: '', date: '', is_paid: true, is_recurring: false };
 
 const WorkConfigPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch } = useAuth();
   const [tab, setTab] = useState('locations');
 
   const [toasts, setToasts] = useState([]);
@@ -35,8 +35,8 @@ const WorkConfigPage = () => {
     setLoading(true);
     try {
       const [lr, sr] = await Promise.all([
-        fetch('/api/work-locations', { headers: getAuthHeaders() }),
-        fetch('/api/work-shifts', { headers: getAuthHeaders() }),
+        authFetch('/api/work-locations'),
+        authFetch('/api/work-shifts'),
       ]);
       if (lr.ok) setLocations(await lr.json());
       if (sr.ok) setShifts(await sr.json());
@@ -49,7 +49,7 @@ const WorkConfigPage = () => {
 
   const fetchHolidays = async (year = holidayYear) => {
     try {
-      const res = await fetch(`/api/holidays?year=${year}`, { headers: getAuthHeaders() });
+      const res = await authFetch(`/api/holidays?year=${year}`);
       if (res.ok) setHolidays(await res.json());
     } catch { showToast('Lỗi tải ngày lễ.', 'error'); }
   };
@@ -67,7 +67,7 @@ const WorkConfigPage = () => {
       allowed_ips: form.allowed_ips || '',
     };
     const url = id ? `/api/work-locations/${id}` : '/api/work-locations';
-    const res = await fetch(url, { method: id ? 'PUT' : 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    const res = await authFetch(url, { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
     const data = await res.json();
     if (res.ok) { showToast(data.message || 'Đã lưu.'); setLocModal(null); fetchAll(); }
     else showToast(data.error || 'Lưu thất bại.', 'error');
@@ -75,7 +75,7 @@ const WorkConfigPage = () => {
 
   const deleteLocation = async (loc) => {
     if (!window.confirm(`Xóa địa điểm "${loc.name}"?`)) return;
-    const res = await fetch(`/api/work-locations/${loc.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+    const res = await authFetch(`/api/work-locations/${loc.id}`, { method: 'DELETE' });
     const data = await res.json();
     showToast(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
     if (res.ok) fetchAll();
@@ -94,7 +94,7 @@ const WorkConfigPage = () => {
       is_default: form.is_default,
     };
     const url = id ? `/api/work-shifts/${id}` : '/api/work-shifts';
-    const res = await fetch(url, { method: id ? 'PUT' : 'POST', headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    const res = await authFetch(url, { method: id ? 'PUT' : 'POST', body: JSON.stringify(payload) });
     const data = await res.json();
     if (res.ok) { showToast(data.message || 'Đã lưu.'); setShiftModal(null); fetchAll(); }
     else showToast(data.error || 'Lưu thất bại.', 'error');
@@ -102,7 +102,7 @@ const WorkConfigPage = () => {
 
   const deleteShift = async (s) => {
     if (!window.confirm(`Xóa ca làm "${s.name}"?`)) return;
-    const res = await fetch(`/api/work-shifts/${s.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+    const res = await authFetch(`/api/work-shifts/${s.id}`, { method: 'DELETE' });
     const data = await res.json();
     showToast(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
     if (res.ok) fetchAll();
@@ -113,7 +113,7 @@ const WorkConfigPage = () => {
     e.preventDefault();
     const { form, id } = holidayModal;
     const url = id ? `/api/holidays/${id}` : '/api/holidays';
-    const res = await fetch(url, { method: id ? 'PUT' : 'POST', headers: getAuthHeaders(), body: JSON.stringify(form) });
+    const res = await authFetch(url, { method: id ? 'PUT' : 'POST', body: JSON.stringify(form) });
     const data = await res.json();
     if (res.ok) { showToast(data.message || 'Đã lưu.'); setHolidayModal(null); fetchHolidays(); }
     else showToast(data.error || 'Lưu thất bại.', 'error');
@@ -121,7 +121,7 @@ const WorkConfigPage = () => {
 
   const deleteHoliday = async (h) => {
     if (!window.confirm(`Xóa ngày lễ "${h.name}" (${h.date})?`)) return;
-    const res = await fetch(`/api/holidays/${h.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+    const res = await authFetch(`/api/holidays/${h.id}`, { method: 'DELETE' });
     const data = await res.json();
     showToast(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
     if (res.ok) fetchHolidays();
@@ -129,7 +129,7 @@ const WorkConfigPage = () => {
 
   const seedVnHolidays = async () => {
     if (!window.confirm(`Nạp các ngày lễ pháp định Việt Nam cho năm ${holidayYear}?`)) return;
-    const res = await fetch('/api/holidays/seed-vn', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ year: holidayYear }) });
+    const res = await authFetch('/api/holidays/seed-vn', { method: 'POST', body: JSON.stringify({ year: holidayYear }) });
     const data = await res.json();
     showToast(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
     if (res.ok) fetchHolidays();

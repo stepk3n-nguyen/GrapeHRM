@@ -4,19 +4,21 @@ import { Play, Eye, CheckCircle2, Lock, Loader2, CheckCircle, FileText, X } from
 
 const fmtMoney = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`;
 const STATUS = {
-  DRAFT: ['Nháp', 'status-badge--pending-hr'],
-  CONFIRMED: ['Đã xác nhận', 'status-badge--warning'],
+  DRAFT: ['Nháp', 'status-badge--warning'],
+  CONFIRMED: ['Đã xác nhận', 'status-badge--pending-hr'],
   LOCKED: ['Đã khóa', 'status-badge--approved'],
 };
 
 const PayrollPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch } = useAuth();
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [detail, setDetail] = useState(null);
+  const [confirmModal, setConfirmModal] = useState(null);
+  const [errorModal, setErrorModal] = useState(null);
 
   const [toasts, setToasts] = useState([]);
   const showToast = (m, type = 'success') => {
@@ -28,7 +30,7 @@ const PayrollPage = () => {
   const fetchRuns = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/payroll', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/payroll');
       if (res.ok) setRuns(await res.json());
     } catch { showToast('Lỗi kết nối.', 'error'); }
     finally { setLoading(false); }
@@ -39,28 +41,57 @@ const PayrollPage = () => {
   const runPayroll = async () => {
     setRunning(true);
     try {
-      const res = await fetch('/api/payroll/run', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({ month, year }) });
+      const res = await authFetch('/api/payroll/run', { method: 'POST', body: JSON.stringify({ month, year }) });
       const data = await res.json();
-      if (res.ok) { showToast(`Đã tính lương cho ${data.payslip_count} nhân viên`); fetchRuns(); openDetail(data.id); }
+      if (res.ok) { 
+        if (data.pending_leave > 0 || data.pending_overtime > 0) {
+          showToast('Vẫn còn đơn nghỉ phép/ tăng ca chưa được duyệt!', 'warning');
+        } else {
+          showToast(`Đã tính lương cho ${data.payslip_count} nhân viên`); 
+        }
+        fetchRuns(); 
+        openDetail(data.id); 
+      }
       else showToast(data.error || 'Chạy lương thất bại.', 'error');
     } catch { showToast('Lỗi kết nối.', 'error'); }
     finally { setRunning(false); }
   };
 
   const openDetail = async (id) => {
-    const res = await fetch(`/api/payroll/${id}`, { headers: getAuthHeaders() });
+    const res = await authFetch(`/api/payroll/${id}`);
     if (res.ok) setDetail(await res.json());
   };
 
   const act = async (id, action) => {
-    const res = await fetch(`/api/payroll/${id}/${action}`, { method: 'PUT', headers: getAuthHeaders() });
+    const res = await authFetch(`/api/payroll/${id}/${action}`, { method: 'PUT' });
     const data = await res.json();
     if (res.ok) { showToast(data.message); fetchRuns(); if (detail?.id === id) openDetail(id); }
     else showToast(data.error || 'Thất bại.', 'error');
   };
 
+  const handleConfirm = async (id) => {
+    try {
+      const res = await authFetch(`/api/payroll/${id}/check-pending`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.pending_leave > 0 || data.pending_overtime > 0) {
+          setErrorModal({
+            message: 'Có đơn nghỉ phép hoặc tăng ca chưa được duyệt!',
+            details: `Còn ${data.pending_leave} đơn nghỉ phép và ${data.pending_overtime} đơn tăng ca.`
+          });
+        } else {
+          setConfirmModal({ id, type: 'confirm' });
+        }
+      } else {
+        showToast('Lỗi khi kiểm tra trạng thái đơn.', 'error');
+      }
+    } catch {
+      showToast('Lỗi kết nối.', 'error');
+    }
+  };
+
   const downloadPdf = async (psId, label) => {
-    const res = await fetch(`/api/payslips/${psId}/export-pdf`, { headers: getAuthHeaders() });
+    const res = await authFetch(`/api/payslips/${psId}/export-pdf`);
     if (res.ok) {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
@@ -72,7 +103,12 @@ const PayrollPage = () => {
   return (
     <div className="fade-in">
       <div className="toast-container">
-        {toasts.map((t) => <div key={t.id} className={`toast toast--${t.type}`}><CheckCircle size={18} style={{ color: t.type === 'success' ? 'var(--color-success)' : 'var(--color-error)' }} /><span>{t.message}</span></div>)}
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast toast--${t.type}`}>
+            <CheckCircle size={18} style={{ color: t.type === 'success' ? 'var(--color-success)' : (t.type === 'warning' ? 'orange' : 'var(--color-error)') }} />
+            <span>{t.message}</span>
+          </div>
+        ))}
       </div>
       <div className="breadcrumb"><span>GrapeHRM</span><span>&gt;</span><span className="breadcrumb__item">Bảng lương</span></div>
 
@@ -106,8 +142,8 @@ const PayrollPage = () => {
                       <td style={{ fontWeight: 600 }}>{fmtMoney(r.total_amount)}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
                         <button className="btn btn--secondary" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => openDetail(r.id)}><Eye size={13} /> Xem</button>
-                        {r.status === 'DRAFT' && <button className="btn btn--primary" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => act(r.id, 'confirm')}><CheckCircle2 size={13} /> Xác nhận</button>}
-                        {r.status === 'CONFIRMED' && <button className="btn btn--danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => act(r.id, 'lock')}><Lock size={13} /> Khóa</button>}
+                        {r.status === 'DRAFT' && <button className="btn btn--primary" style={{ padding: '4px 10px', fontSize: 12, marginRight: 6 }} onClick={() => handleConfirm(r.id)}><CheckCircle2 size={13} /> Xác nhận</button>}
+                        {r.status === 'CONFIRMED' && <button className="btn btn--danger" style={{ padding: '4px 10px', fontSize: 12 }} onClick={() => setConfirmModal({ id: r.id, type: 'lock' })}><Lock size={13} /> Khóa</button>}
                       </td>
                     </tr>
                   ))}
@@ -222,9 +258,59 @@ const PayrollPage = () => {
               </div>
             </div>
             <div className="modal__footer">
-              {detail.status === 'DRAFT' && <button className="btn btn--primary" onClick={() => act(detail.id, 'confirm')}><CheckCircle2 size={16} /> Xác nhận</button>}
-              {detail.status === 'CONFIRMED' && <button className="btn btn--danger" onClick={() => act(detail.id, 'lock')}><Lock size={16} /> Khóa đợt</button>}
+              {detail.status === 'DRAFT' && <button className="btn btn--primary" onClick={() => handleConfirm(detail.id)}><CheckCircle2 size={16} /> Xác nhận</button>}
+              {detail.status === 'CONFIRMED' && <button className="btn btn--danger" onClick={() => setConfirmModal({ id: detail.id, type: 'lock' })}><Lock size={16} /> Khóa đợt</button>}
               <button className="btn btn--secondary" onClick={() => setDetail(null)}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Lỗi */}
+      {errorModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 450 }}>
+            <div className="modal__header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: 'var(--color-error)' }}>
+                <X size={28} style={{ background: '#FEE2E2', padding: 4, borderRadius: '50%' }} />
+                <h3 className="modal__title" style={{ color: 'var(--color-error)', margin: 0 }}>Lỗi xác nhận</h3>
+              </div>
+            </div>
+            <div className="modal__body" style={{ paddingTop: 16, paddingBottom: 24, fontSize: 15 }}>
+              <div style={{ fontWeight: 600, marginBottom: 8 }}>{errorModal.message}</div>
+              <div style={{ color: 'var(--color-text-muted)' }}>{errorModal.details}</div>
+            </div>
+            <div className="modal__footer" style={{ borderTop: 'none', paddingTop: 0 }}>
+              <button className="btn btn--secondary" onClick={() => setErrorModal(null)}>Đóng</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác nhận */}
+      {confirmModal && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: 400 }}>
+            <div className="modal__header" style={{ borderBottom: 'none', paddingBottom: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: confirmModal.type === 'lock' ? 'var(--color-error)' : 'var(--color-primary-dark)' }}>
+                {confirmModal.type === 'lock' ? (
+                  <Lock size={28} style={{ background: '#FEE2E2', padding: 4, borderRadius: '50%' }} />
+                ) : (
+                  <CheckCircle2 size={28} style={{ background: '#E0E7FF', padding: 4, borderRadius: '50%' }} />
+                )}
+                <h3 className="modal__title" style={{ margin: 0 }}>{confirmModal.type === 'lock' ? 'Khóa đợt lương' : 'Xác nhận đợt lương'}</h3>
+              </div>
+            </div>
+            <div className="modal__body" style={{ paddingTop: 16, paddingBottom: 24, fontSize: 15 }}>
+              {confirmModal.type === 'lock' 
+                ? 'Bạn có chắc chắn muốn khóa đợt lương này? Thao tác này không thể hoàn tác.' 
+                : 'Bạn có chắc chắn muốn xác nhận đợt lương này? Thao tác này sẽ cập nhật trạng thái đợt lương thành "Đã xác nhận".'}
+            </div>
+            <div className="modal__footer" style={{ borderTop: 'none', paddingTop: 0, display: 'flex', gap: 12 }}>
+              <button className="btn btn--secondary" onClick={() => setConfirmModal(null)} style={{ flex: 1 }}>Hủy</button>
+              <button className={`btn btn--${confirmModal.type === 'lock' ? 'danger' : 'primary'}`} onClick={() => { act(confirmModal.id, confirmModal.type); setConfirmModal(null); }} style={{ flex: 1 }}>
+                {confirmModal.type === 'lock' ? 'Khóa' : 'Xác nhận'}
+              </button>
             </div>
           </div>
         </div>

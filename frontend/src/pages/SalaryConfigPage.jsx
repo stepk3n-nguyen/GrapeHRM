@@ -5,7 +5,7 @@ import { Layers, PlusCircle, MinusCircle, UserCog, Plus, Pencil, Trash2, Loader2
 const fmtMoney = (v) => (v == null ? '—' : `${Number(v).toLocaleString('vi-VN')} đ`);
 
 const SalaryConfigPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch } = useAuth();
   const [tab, setTab] = useState('structures');
   const [loading, setLoading] = useState(true);
 
@@ -27,10 +27,10 @@ const SalaryConfigPage = () => {
     setLoading(true);
     try {
       const [s, a, d, e] = await Promise.all([
-        fetch('/api/salary-structures', { headers: getAuthHeaders() }),
-        fetch('/api/salary-allowances', { headers: getAuthHeaders() }),
-        fetch('/api/salary-deductions', { headers: getAuthHeaders() }),
-        fetch('/api/employee-salaries', { headers: getAuthHeaders() }),
+        authFetch('/api/salary-structures'),
+        authFetch('/api/salary-allowances'),
+        authFetch('/api/salary-deductions'),
+        authFetch('/api/employee-salaries'),
       ]);
       if (s.ok) setStructures(await s.json());
       if (a.ok) setAllowances(await a.json());
@@ -55,7 +55,7 @@ const SalaryConfigPage = () => {
     }
     const method = id ? 'PUT' : 'POST';
     const finalUrl = id ? `${url}/${id}` : url;
-    const res = await fetch(finalUrl, { method, headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    const res = await authFetch(finalUrl, { method, body: JSON.stringify(payload) });
     const data = await res.json();
     if (res.ok) { showToast(data.message || 'Đã lưu.'); setModal(null); fetchAll(); }
     else showToast(data.error || 'Lưu thất bại.', 'error');
@@ -64,7 +64,7 @@ const SalaryConfigPage = () => {
   const del = async (kind, id) => {
     const urls = { structure: 'salary-structures', allowance: 'salary-allowances', deduction: 'salary-deductions' };
     if (!window.confirm('Xóa mục này?')) return;
-    const res = await fetch(`/api/${urls[kind]}/${id}`, { method: 'DELETE', headers: getAuthHeaders() });
+    const res = await authFetch(`/api/${urls[kind]}/${id}`, { method: 'DELETE' });
     const data = await res.json();
     showToast(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
     if (res.ok) fetchAll();

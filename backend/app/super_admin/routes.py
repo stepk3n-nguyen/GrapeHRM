@@ -81,7 +81,7 @@ def update_tenant(tid):
     for f in ["name", "phone", "email", "country", "city", "address"]:
         if f in d:
             setattr(t, f, d[f])
-
+    # kiểm tra tenant đã có bảng cấu hình TenantConfig chưa, nếu ko thì tạo mới 
     cfg = TenantConfig.query.filter_by(tenant_id=t.id).first()
     if not cfg:
         cfg = TenantConfig(tenant_id=t.id)

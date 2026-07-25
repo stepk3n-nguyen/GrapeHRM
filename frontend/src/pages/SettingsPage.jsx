@@ -13,7 +13,7 @@ const ROLE_LABELS = {
 };
 
 const SettingsPage = () => {
-  const { user, getAuthHeaders } = useAuth();
+  const { user, authFetch } = useAuth();
   const [activeTab, setActiveTab] = useState('org');
 
   const [toasts, setToasts] = useState([]);
@@ -31,7 +31,7 @@ const SettingsPage = () => {
   const fetchOrg = async () => {
     setOrgLoading(true);
     try {
-      const res = await fetch('/api/admin/organization', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/admin/organization');
       if (res.ok) setOrg(await res.json());
       else showToast('Không tải được thông tin tổ chức.', 'error');
     } catch {
@@ -45,9 +45,8 @@ const SettingsPage = () => {
     e.preventDefault();
     setOrgSaving(true);
     try {
-      const res = await fetch('/api/admin/organization', {
+      const res = await authFetch('/api/admin/organization', {
         method: 'PUT',
-        headers: getAuthHeaders(),
         body: JSON.stringify(org),
       });
       const data = await res.json();
@@ -67,7 +66,7 @@ const SettingsPage = () => {
   const fetchUsers = async () => {
     setUsersLoading(true);
     try {
-      const res = await fetch('/api/admin/users', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/admin/users');
       if (res.ok) setUsers(await res.json());
       else showToast('Không tải được danh sách tài khoản.', 'error');
     } catch {
@@ -79,9 +78,8 @@ const SettingsPage = () => {
 
   const toggleActive = async (u) => {
     try {
-      const res = await fetch(`/api/admin/users/${u.id}/toggle-active`, {
+      const res = await authFetch(`/api/admin/users/${u.id}/toggle-active`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       if (res.ok) {
@@ -98,9 +96,8 @@ const SettingsPage = () => {
   const resetPassword = async (u) => {
     if (!window.confirm(`Reset mật khẩu của "${u.username}" về "123456"?`)) return;
     try {
-      const res = await fetch(`/api/admin/users/${u.id}/reset-password`, {
+      const res = await authFetch(`/api/admin/users/${u.id}/reset-password`, {
         method: 'PUT',
-        headers: getAuthHeaders(),
       });
       const data = await res.json();
       showToast(res.ok ? data.message : (data.error || 'Thất bại.'), res.ok ? 'success' : 'error');
@@ -117,7 +114,7 @@ const SettingsPage = () => {
   const fetchAudit = async (page = 1) => {
     setAuditLoading(true);
     try {
-      const res = await fetch(`/api/admin/audit-logs?page=${page}&per_page=20`, { headers: getAuthHeaders() });
+      const res = await authFetch(`/api/admin/audit-logs?page=${page}&per_page=20`);
       if (res.ok) setAudit(await res.json());
       else showToast('Không tải được nhật ký.', 'error');
     } catch {

@@ -8,13 +8,13 @@ const OT_TYPES = [
   { value: 'HOLIDAY', label: 'Ngày lễ (300%)' },
 ];
 const STATUS_BADGE = {
-  PENDING: { cls: 'status-badge--pending', text: 'Chờ duyệt' },
+  PENDING: { cls: 'status-badge--warning', text: 'Chờ duyệt' },
   APPROVED: { cls: 'status-badge--approved', text: 'Đã duyệt' },
   REJECTED: { cls: 'status-badge--rejected', text: 'Từ chối' },
 };
 
 const OvertimePage = () => {
-  const { user, getAuthHeaders } = useAuth();
+  const { user, authFetch } = useAuth();
   const isHR = ['admin', 'super_admin', 'hr_manager'].includes(user?.role);
 
   const [items, setItems] = useState([]);
@@ -31,7 +31,7 @@ const OvertimePage = () => {
   const fetchItems = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/overtime', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/overtime');
       if (res.ok) setItems(await res.json());
     } catch { showToast('Lỗi kết nối.', 'error'); }
     finally { setLoading(false); }
@@ -41,7 +41,7 @@ const OvertimePage = () => {
 
   const submit = async (e) => {
     e.preventDefault();
-    const res = await fetch('/api/overtime', { method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(modal.form) });
+    const res = await authFetch('/api/overtime', { method: 'POST', body: JSON.stringify(modal.form) });
     const data = await res.json();
     if (res.ok) { showToast(data.message || 'Đã gửi.'); setModal(null); fetchItems(); }
     else showToast(data.error || 'Thất bại.', 'error');
@@ -50,7 +50,7 @@ const OvertimePage = () => {
   const act = async (id, action) => {
     const method = action === 'delete' ? 'DELETE' : 'PUT';
     const url = action === 'delete' ? `/api/overtime/${id}` : `/api/overtime/${id}/${action}`;
-    const res = await fetch(url, { method, headers: getAuthHeaders() });
+    const res = await authFetch(url, { method });
     const data = await res.json();
     showToast(res.ok ? data.message : data.error, res.ok ? 'success' : 'error');
     if (res.ok) fetchItems();

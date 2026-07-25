@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 const ProfilePage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch } = useAuth();
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -25,7 +25,7 @@ const ProfilePage = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const res = await fetch('/api/employees/me', { headers: getAuthHeaders() });
+        const res = await authFetch('/api/employees/me');
         if (res.ok) setProfile(await res.json());
         else setProfile(null);
       } catch (err) {
@@ -35,7 +35,7 @@ const ProfilePage = () => {
       }
     };
     fetchProfile();
-  }, [getAuthHeaders]);
+  }, [authFetch]);
 
   // Đánh giá độ mạnh mật khẩu mới theo cùng quy tắc với backend
   const pwScore = (() => {
@@ -73,9 +73,8 @@ const ProfilePage = () => {
 
     setPwLoading(true);
     try {
-      const res = await fetch('/api/auth/change-password', {
+      const res = await authFetch('/api/auth/change-password', {
         method: 'PUT',
-        headers: getAuthHeaders(),
         body: JSON.stringify(pwForm),
       });
       const data = await res.json();

@@ -10,14 +10,16 @@ const LoginPage = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
     const trimmedUsername = username.trim();
-    const trimmedSlug = tenantSlug.trim().toLowerCase();
-    if (!trimmedSlug) {
+    const trimmedSlug = isSuperAdmin ? '' : tenantSlug.trim().toLowerCase();
+
+    if (!isSuperAdmin && !trimmedSlug) {
       setError('Vui lòng nhập mã tổ chức.');
       return;
     }
@@ -63,35 +65,37 @@ const LoginPage = () => {
         )}
 
         <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label form-label--required" htmlFor="tenantSlug">Mã tổ chức</label>
-            <div style={{ position: 'relative' }}>
-              <Building2
-                size={16}
-                style={{
-                  position: 'absolute',
-                  left: '12px',
-                  top: '50%',
-                  transform: 'translateY(-50%)',
-                  color: 'var(--color-text-muted)'
-                }}
-              />
-              <input
-                id="tenantSlug"
-                type="text"
-                className="input"
-                placeholder="ví dụ: grapecorp"
-                value={tenantSlug}
-                onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
-                style={{ paddingLeft: '38px' }}
-                disabled={loading}
-                autoCapitalize="none"
-              />
+          {!isSuperAdmin && (
+            <div className="form-group">
+              <label className="form-label form-label--required" htmlFor="tenantSlug">Mã tổ chức</label>
+              <div style={{ position: 'relative' }}>
+                <Building2
+                  size={16}
+                  style={{
+                    position: 'absolute',
+                    left: '12px',
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    color: 'var(--color-text-muted)'
+                  }}
+                />
+                <input
+                  id="tenantSlug"
+                  type="text"
+                  className="input"
+                  placeholder="Nhập mã tổ chức"
+                  value={tenantSlug}
+                  onChange={(e) => setTenantSlug(e.target.value.toLowerCase())}
+                  style={{ paddingLeft: '38px' }}
+                  disabled={loading}
+                  autoCapitalize="none"
+                />
+              </div>
+              <small style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
+                Liên hệ quản trị viên nếu bạn chưa biết mã tổ chức.
+              </small>
             </div>
-            <small style={{ color: 'var(--color-text-muted)', fontSize: '12px' }}>
-              Liên hệ quản trị viên nếu bạn chưa biết mã tổ chức.
-            </small>
-          </div>
+          )}
 
           <div className="form-group">
             <label className="form-label" htmlFor="username">Tên tài khoản</label>
@@ -110,7 +114,7 @@ const LoginPage = () => {
                 id="username"
                 type="text"
                 className="input"
-                placeholder="Nhập username (ví dụ: admin)"
+                placeholder="Nhập username"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 style={{ paddingLeft: '38px' }}
@@ -136,13 +140,26 @@ const LoginPage = () => {
                 id="password"
                 type="password"
                 className="input"
-                placeholder="Nhập mật khẩu (ví dụ: admin123)"
+                placeholder="Nhập mật khẩu"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 style={{ paddingLeft: '38px' }}
                 disabled={loading}
               />
             </div>
+          </div>
+
+          <div className="form-group" style={{ marginBottom: '24px' }}>
+            <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', fontSize: '14px' }}>
+              <input
+                type="checkbox"
+                checked={isSuperAdmin}
+                onChange={(e) => setIsSuperAdmin(e.target.checked)}
+                disabled={loading}
+                style={{ marginRight: '8px' }}
+              />
+              Đăng nhập với tư cách Super Admin
+            </label>
           </div>
 
           <button

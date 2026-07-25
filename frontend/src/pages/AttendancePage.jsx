@@ -14,7 +14,7 @@ const STATUS_OPTS = [
 ];
 
 const AttendancePage = () => {
-  const { user, getAuthHeaders } = useAuth();
+  const { user, authFetch } = useAuth();
   const [attendance, setAttendance] = useState([]);
   const [loading, setLoading] = useState(false);
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -44,7 +44,7 @@ const AttendancePage = () => {
     setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), 4000);
   };
 
-  const isAdminOrHR = user?.role === 'admin' || user?.role === 'hr_manager';
+  const isAdminOrHR = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr_manager';
   const canSelfPunch = !!user?.employee_id;
 
   const fetchAttendance = async () => {
@@ -53,7 +53,7 @@ const AttendancePage = () => {
       const url = isAdminOrHR
         ? `/api/attendance?month=${month}&year=${year}`
         : `/api/attendance?employee_id=${user.employee_id}&month=${month}&year=${year}`;
-      const response = await fetch(url, { headers: getAuthHeaders() });
+      const response = await authFetch(url);
       if (response.ok) setAttendance(await response.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -62,7 +62,7 @@ const AttendancePage = () => {
   const fetchEmployees = async () => {
     if (!isAdminOrHR) return;
     try {
-      const response = await fetch('/api/employees', { headers: getAuthHeaders() });
+      const response = await authFetch('/api/employees');
       if (response.ok) setEmployees(await response.json());
     } catch (err) { console.error(err); }
   };
@@ -70,7 +70,7 @@ const AttendancePage = () => {
   const fetchSummary = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/attendance/summary?month=${month}&year=${year}`, { headers: getAuthHeaders() });
+      const res = await authFetch(`/api/attendance/summary?month=${month}&year=${year}`);
       if (res.ok) setSummary((await res.json()).rows || []);
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -79,7 +79,7 @@ const AttendancePage = () => {
   const fetchToday = async () => {
     if (!canSelfPunch) return;
     try {
-      const res = await fetch('/api/attendance/today', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/attendance/today');
       if (res.ok) {
         const data = await res.json();
         setToday(data.attendance);
@@ -100,8 +100,8 @@ const AttendancePage = () => {
   const punch = async (kind) => {
     setPunching(true);
     try {
-      const res = await fetch(`/api/attendance/${kind}`, {
-        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify({}),
+      const res = await authFetch(`/api/attendance/${kind}`, {
+        method: 'POST', body: JSON.stringify({}),
       });
       const data = await res.json();
       if (res.ok) {
@@ -121,7 +121,7 @@ const AttendancePage = () => {
 
   const handleExportSummary = async () => {
     try {
-      const response = await fetch(`/api/attendance/summary/export?month=${month}&year=${year}`, { headers: getAuthHeaders() });
+      const response = await authFetch(`/api/attendance/summary/export?month=${month}&year=${year}`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -134,7 +134,7 @@ const AttendancePage = () => {
 
   const handleExport = async () => {
     try {
-      const response = await fetch(`/api/attendance/export?month=${month}&year=${year}`, { headers: getAuthHeaders() });
+      const response = await authFetch(`/api/attendance/export?month=${month}&year=${year}`);
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -161,7 +161,7 @@ const AttendancePage = () => {
     e.preventDefault();
     const url = editingId ? `/api/attendance/${editingId}` : '/api/attendance';
     try {
-      const response = await fetch(url, { method: editingId ? 'PUT' : 'POST', headers: getAuthHeaders(), body: JSON.stringify(formData) });
+      const response = await authFetch(url, { method: editingId ? 'PUT' : 'POST', body: JSON.stringify(formData) });
       const d = await response.json();
       if (response.ok) {
         showToast(editingId ? 'Đã cập nhật chấm công' : 'Đã thêm chấm công thủ công');
@@ -176,7 +176,7 @@ const AttendancePage = () => {
   const handleDelete = async (r) => {
     if (!window.confirm(`Xóa chấm công ngày ${new Date(r.date).toLocaleDateString('vi-VN')} của ${r.employee_name}?`)) return;
     try {
-      const res = await fetch(`/api/attendance/${r.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const res = await authFetch(`/api/attendance/${r.id}`, { method: 'DELETE' });
       const d = await res.json();
       showToast(res.ok ? d.message : d.error, res.ok ? 'success' : 'error');
       if (res.ok) fetchAttendance();

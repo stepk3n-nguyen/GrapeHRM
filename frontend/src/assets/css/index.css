@@ -226,7 +226,6 @@ textarea {
 
 .header__logout-btn:hover {
   background: rgba(255, 255, 255, 0.25);
-  transform: translateY(-1px);
 }
 
 /* Sidebar trái cố định */
@@ -313,7 +312,6 @@ textarea {
 
 .card:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
 }
 
 .card--no-hover:hover {
@@ -423,7 +421,6 @@ textarea {
 .btn--primary:hover:not(:disabled) {
   background-color: var(--color-primary-dark);
   box-shadow: 0 4px 12px rgba(10, 110, 209, 0.25);
-  transform: translateY(-1px);
 }
 
 .btn--secondary {
@@ -434,7 +431,6 @@ textarea {
 
 .btn--secondary:hover:not(:disabled) {
   background-color: var(--color-primary-light);
-  transform: translateY(-1px);
 }
 
 .btn--danger {
@@ -445,7 +441,6 @@ textarea {
 .btn--danger:hover:not(:disabled) {
   background-color: #C82333;
   box-shadow: 0 4px 12px rgba(220, 53, 69, 0.25);
-  transform: translateY(-1px);
 }
 
 .btn:disabled {
@@ -793,7 +788,6 @@ textarea {
 
 .widget:hover {
   box-shadow: var(--shadow-md);
-  transform: translateY(-2px);
 }
 
 .widget__info {

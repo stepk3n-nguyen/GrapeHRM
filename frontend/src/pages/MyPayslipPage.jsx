@@ -5,7 +5,7 @@ import { Loader2, FileText, Download } from 'lucide-react';
 const fmtMoney = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`;
 
 const MyPayslipPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch } = useAuth();
   const [month, setMonth] = useState(new Date().getMonth() + 1);
   const [year, setYear] = useState(new Date().getFullYear());
   const [slip, setSlip] = useState(null);
@@ -15,7 +15,7 @@ const MyPayslipPage = () => {
   const fetchSlip = async () => {
     setLoading(true); setError(''); setSlip(null);
     try {
-      const res = await fetch(`/api/payslips/me?month=${month}&year=${year}`, { headers: getAuthHeaders() });
+      const res = await authFetch(`/api/payslips/me?month=${month}&year=${year}`);
       const data = await res.json();
       if (res.ok) setSlip(data);
       else setError(data.error || 'Không có dữ liệu.');
@@ -26,7 +26,7 @@ const MyPayslipPage = () => {
   useEffect(() => { fetchSlip(); /* eslint-disable-next-line */ }, [month, year]);
 
   const downloadPdf = async () => {
-    const res = await fetch(`/api/payslips/${slip.id}/export-pdf`, { headers: getAuthHeaders() });
+    const res = await authFetch(`/api/payslips/${slip.id}/export-pdf`);
     if (res.ok) {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

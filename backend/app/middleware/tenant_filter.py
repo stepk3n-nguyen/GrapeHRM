@@ -42,8 +42,15 @@ def tenant_filter_middleware(app):
             g.user_role = claims.get("role")
 
             if g.tenant_id is None:
-                from flask import jsonify
-                return jsonify({"error": "Thiếu thông tin tenant trong token"}), 403
+                if g.user_role == "super_admin":
+                    # Cho phép super admin truy cập một số route cụ thể không cần tenant_id
+                    allowed_no_tenant = ["/api/super-admin", "/api/auth/switch-tenant", "/api/auth/me", "/api/tenants"]
+                    if not any(request.path.startswith(prefix) for prefix in allowed_no_tenant):
+                        from flask import jsonify
+                        return jsonify({"error": "Vui lòng chọn tổ chức để truy cập chức năng này"}), 403
+                else:
+                    from flask import jsonify
+                    return jsonify({"error": "Thiếu thông tin tenant trong token"}), 403
 
         except NoAuthorizationError:
             from flask import jsonify

@@ -19,7 +19,7 @@ const Card = ({ title, children, height = 300 }) => (
 );
 
 const ReportsPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch } = useAuth();
   const [tab, setTab] = useState('employees');
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState(new Date().getMonth() + 1);
@@ -32,9 +32,9 @@ const ReportsPage = () => {
     setLoading(true);
     try {
       const [e, l, a] = await Promise.all([
-        fetch(`/api/reports/employees?year=${year}`, { headers: getAuthHeaders() }),
-        fetch(`/api/reports/leave?year=${year}`, { headers: getAuthHeaders() }),
-        fetch(`/api/reports/attendance?year=${year}&month=${month}`, { headers: getAuthHeaders() }),
+        authFetch(`/api/reports/employees?year=${year}`),
+        authFetch(`/api/reports/leave?year=${year}`),
+        authFetch(`/api/reports/attendance?year=${year}&month=${month}`),
       ]);
       if (e.ok) setEmp(await e.json());
       if (l.ok) setLeave(await l.json());
@@ -46,7 +46,7 @@ const ReportsPage = () => {
   useEffect(() => { fetchAll(); /* eslint-disable-next-line */ }, [year, month]);
 
   const exportEmployees = async () => {
-    const res = await fetch(`/api/reports/employees/export?year=${year}`, { headers: getAuthHeaders() });
+    const res = await authFetch(`/api/reports/employees/export?year=${year}`);
     if (res.ok) {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);

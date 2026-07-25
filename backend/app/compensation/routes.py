@@ -14,6 +14,8 @@ from app.models.compensation import (
     SalaryStructure, SalaryAllowance, SalaryDeduction, EmployeeSalary,
     PayrollRun, Payslip, PayslipItem, OvertimeRequest
 )
+from app.models.leave import LeaveRequest
+from sqlalchemy import or_, and_, extract
 from app.services.payroll_service import run_payroll
 from app.services.audit_service import log_action
 from . import compensation_bp
@@ -267,7 +269,16 @@ def run_payroll_route():
     log_action("RUN", "PAYROLL", run.id, details={"month": month, "year": year, "total": float(run.total_amount)})
     db.session.commit()
 
-    return jsonify({"message": "Đã chạy bảng lương", "id": run.id, "payslip_count": len(run.payslips), "total_amount": float(run.total_amount)}), 200
+    pending_leaves, pending_ot = _count_pending_requests(g.tenant_id, month, year)
+
+    return jsonify({
+        "message": "Đã chạy bảng lương",
+        "id": run.id,
+        "payslip_count": len(run.payslips),
+        "total_amount": float(run.total_amount),
+        "pending_leave": pending_leaves,
+        "pending_overtime": pending_ot
+    }), 200
 
 
 def _serialize_payslip(ps, detail=False):
@@ -311,6 +322,46 @@ def get_payroll(run_id):
         "company_name": tenant.name if tenant else None,
         "total_amount": float(run.total_amount),
         "payslips": [_serialize_payslip(p, detail=True) for p in run.payslips],
+    }), 200
+
+
+def _count_pending_requests(tenant_id, month, year):
+    # Check LeaveRequest (PENDING_HR and overlaps with month/year)
+    pending_leaves = LeaveRequest.query.filter(
+        LeaveRequest.tenant_id == tenant_id,
+        LeaveRequest.status == "PENDING_HR",
+        or_(
+            and_(extract('year', LeaveRequest.start_date) == year, extract('month', LeaveRequest.start_date) == month),
+            and_(extract('year', LeaveRequest.end_date) == year, extract('month', LeaveRequest.end_date) == month)
+        )
+    ).count()
+
+    # Check OvertimeRequest (PENDING and exactly in month/year)
+    pending_ot = OvertimeRequest.query.filter(
+        OvertimeRequest.tenant_id == tenant_id,
+        OvertimeRequest.status == "PENDING",
+        extract('year', OvertimeRequest.date) == year,
+        extract('month', OvertimeRequest.date) == month
+    ).count()
+
+    return pending_leaves, pending_ot
+
+
+@compensation_bp.route("/payroll/<int:run_id>/check-pending", methods=["GET"])
+@jwt_required()
+def check_pending_for_payroll(run_id):
+    block = _guard()
+    if block:
+        return block
+    run = PayrollRun.query.filter_by(id=run_id, tenant_id=g.tenant_id).first()
+    if not run:
+        return jsonify({"error": "Không tìm thấy"}), 404
+        
+    pending_leaves, pending_ot = _count_pending_requests(g.tenant_id, run.month, run.year)
+
+    return jsonify({
+        "pending_leave": pending_leaves,
+        "pending_overtime": pending_ot
     }), 200
 
 

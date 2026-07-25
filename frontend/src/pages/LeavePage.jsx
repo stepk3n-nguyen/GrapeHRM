@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Plus, Check, X as XIcon, Loader2, AlertTriangle, CheckCircle, Calendar, CalendarDays } from 'lucide-react';
 
 const LeavePage = () => {
-  const { user, getAuthHeaders } = useAuth();
+  const { user, authFetch } = useAuth();
   const [activeTab, setActiveTab] = useState('personal');
   const [loading, setLoading] = useState(false);
   const [leaveBalances, setLeaveBalances] = useState([]);
@@ -29,7 +29,7 @@ const LeavePage = () => {
     }, 3000);
   };
 
-  const isAdminOrHR = user?.role === 'admin' || user?.role === 'hr_manager';
+  const isAdminOrHR = user?.role === 'admin' || user?.role === 'super_admin' || user?.role === 'hr_manager';
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
 
   useEffect(() => {
@@ -41,7 +41,7 @@ const LeavePage = () => {
   const fetchLeaveBalances = async () => {
     if (!user?.employee_id) return;
     try {
-      const response = await fetch(`/api/leave-balance/${user.employee_id}`, { headers: getAuthHeaders() });
+      const response = await authFetch(`/api/leave-balance/${user.employee_id}`);
       if (response.ok) {
         setLeaveBalances(await response.json());
       }
@@ -52,7 +52,7 @@ const LeavePage = () => {
 
   const fetchLeaveTypes = async () => {
     try {
-      const response = await fetch('/api/leave-types', { headers: getAuthHeaders() });
+      const response = await authFetch('/api/leave-types');
       if (response.ok) setLeaveTypes(await response.json());
     } catch (err) { console.error(err); }
   };
@@ -61,7 +61,7 @@ const LeavePage = () => {
     if (!user?.employee_id) return;
     setLoading(true);
     try {
-      const response = await fetch(`/api/leave-requests?employee_id=${user.employee_id}`, { headers: getAuthHeaders() });
+      const response = await authFetch(`/api/leave-requests?employee_id=${user.employee_id}`);
       if (response.ok) setMyRequests(await response.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -70,7 +70,7 @@ const LeavePage = () => {
   const fetchPendingRequests = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/leave-requests?status=PENDING_HR', { headers: getAuthHeaders() });
+      const response = await authFetch('/api/leave-requests?status=PENDING_HR');
       if (response.ok) setPendingRequests(await response.json());
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
@@ -109,9 +109,8 @@ const LeavePage = () => {
   const handleSubmitRequest = async (e) => {
     e.preventDefault();
     try {
-      const response = await fetch('/api/leave-requests', {
+      const response = await authFetch('/api/leave-requests', {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ ...formData, employee_id: user.employee_id })
       });
       const data = await response.json();
@@ -131,9 +130,8 @@ const LeavePage = () => {
 
   const handleApprove = async (reqId) => {
     try {
-      const response = await fetch(`/api/leave-requests/${reqId}/approve`, {
-        method: 'PUT',
-        headers: getAuthHeaders()
+      const response = await authFetch(`/api/leave-requests/${reqId}/approve`, {
+        method: 'PUT'
       });
       if (response.ok) {
         showToast('Đã phê duyệt đơn nghỉ phép');
@@ -149,9 +147,8 @@ const LeavePage = () => {
 
   const handleReject = async (reqId) => {
     try {
-      const response = await fetch(`/api/leave-requests/${reqId}/reject`, {
-        method: 'PUT',
-        headers: getAuthHeaders()
+      const response = await authFetch(`/api/leave-requests/${reqId}/reject`, {
+        method: 'PUT'
       });
       if (response.ok) {
         showToast('Đã từ chối đơn nghỉ phép');
@@ -167,7 +164,7 @@ const LeavePage = () => {
 
   const renderStatus = (status) => {
     switch(status) {
-      case 'PENDING_HR': return <span className="status-badge status-badge--pending-hr">Chờ HR duyệt</span>;
+      case 'PENDING_HR': return <span className="status-badge status-badge--warning">Chờ HR duyệt</span>;
       case 'APPROVED': return <span className="status-badge status-badge--approved">Đã duyệt</span>;
       case 'REJECTED': return <span className="status-badge status-badge--rejected">Từ chối</span>;
       case 'CANCELLED': return <span className="status-badge status-badge--cancelled">Đã hủy</span>;
@@ -341,13 +338,15 @@ const LeavePage = () => {
                             {req.end_date < getLocalDateStr() && !isAdmin ? (
                               <span style={{ fontSize: '13px', color: 'var(--color-error)', fontWeight: 500, marginRight: '8px' }}>Quá hạn</span>
                             ) : (
-                              <button className="btn btn--icon" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(req.id)} title="Duyệt">
-                                <Check size={16} />
-                              </button>
+                              <>
+                                <button className="btn btn--icon" style={{ color: 'var(--color-success)', borderColor: 'var(--color-success)' }} onClick={() => handleApprove(req.id)} title="Duyệt">
+                                  <Check size={16} />
+                                </button>
+                                <button className="btn btn--icon" style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={() => handleReject(req.id)} title="Từ chối">
+                                  <XIcon size={16} />
+                                </button>
+                              </>
                             )}
-                            <button className="btn btn--icon" style={{ color: 'var(--color-error)', borderColor: 'var(--color-error)' }} onClick={() => handleReject(req.id)} title="Từ chối">
-                              <XIcon size={16} />
-                            </button>
                           </div>
                         </td>
                       </tr>

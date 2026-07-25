@@ -5,7 +5,7 @@ import { Building2, Plus, Pencil, Lock, Unlock, Loader2, CheckCircle, Users } fr
 const PLAN_BADGE = { FREE: 'badge--info', PRO: 'badge--success', ENTERPRISE: 'badge--warning' };
 
 const SuperAdminPage = () => {
-  const { getAuthHeaders } = useAuth();
+  const { authFetch, activeTenant, switchTenant } = useAuth();
   const [tenants, setTenants] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // {kind:'create'|'edit', form, id?}
@@ -20,7 +20,7 @@ const SuperAdminPage = () => {
   const fetchTenants = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/super-admin/tenants', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/super-admin/tenants');
       if (res.ok) { const d = await res.json(); setTenants(d.items); }
       else showToast('Không tải được danh sách tổ chức.', 'error');
     } catch { showToast('Lỗi kết nối.', 'error'); }
@@ -40,17 +40,26 @@ const SuperAdminPage = () => {
       url = `/api/super-admin/tenants/${id}`; method = 'PUT';
       payload = { name: form.name, plan: form.plan, max_employees: Number(form.max_employees) };
     }
-    const res = await fetch(url, { method, headers: getAuthHeaders(), body: JSON.stringify(payload) });
+    const res = await authFetch(url, { method, body: JSON.stringify(payload) });
     const data = await res.json();
     if (res.ok) { showToast(data.message || 'Đã lưu.'); setModal(null); fetchTenants(); }
     else showToast(data.error || 'Thất bại.', 'error');
   };
 
   const toggle = async (t) => {
-    const res = await fetch(`/api/super-admin/tenants/${t.id}/toggle-active`, { method: 'PUT', headers: getAuthHeaders() });
+    const res = await authFetch(`/api/super-admin/tenants/${t.id}/toggle-active`, { method: 'PUT' });
     const data = await res.json();
     if (res.ok) { showToast(data.message); fetchTenants(); }
     else showToast(data.error, 'error');
+  };
+
+  const handleManage = async (t) => {
+    const res = await switchTenant(t.id, { id: t.id, name: t.name, slug: t.slug });
+    if (res.success) {
+      showToast(`Đã chuyển sang quản lý ${t.name}`);
+    } else {
+      showToast(res.error, 'error');
+    }
   };
 
   const total = tenants.length;
@@ -82,14 +91,28 @@ const SuperAdminPage = () => {
                 <thead><tr><th>Tên</th><th>Slug</th><th>Gói</th><th>NV</th><th>User</th><th>Trạng thái</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>
                 <tbody>
                   {tenants.map((t) => (
-                    <tr key={t.id}>
-                      <td style={{ fontWeight: 600 }}><Building2 size={14} style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--color-primary)' }} />{t.name}</td>
+                    <tr key={t.id} style={{ backgroundColor: activeTenant?.id === t.id ? 'rgba(79, 70, 229, 0.05)' : undefined }}>
+                      <td style={{ fontWeight: 600 }}>
+                        <Building2 size={14} style={{ marginRight: 6, verticalAlign: 'middle', color: 'var(--color-primary)' }} />
+                        {t.name}
+                        {activeTenant?.id === t.id && <span style={{ marginLeft: 8, fontSize: 10, backgroundColor: 'var(--color-primary)', color: 'white', padding: '2px 6px', borderRadius: 10 }}>Đang chọn</span>}
+                      </td>
                       <td><code>{t.slug}</code></td>
                       <td><span className={`badge ${PLAN_BADGE[t.plan] || 'badge--info'}`}>{t.plan}</span></td>
                       <td><Users size={13} style={{ verticalAlign: 'middle', marginRight: 3 }} />{t.total_employees}</td>
                       <td>{t.total_users}</td>
                       <td>{t.is_active ? <span className="status-badge status-badge--approved">Hoạt động</span> : <span className="status-badge status-badge--rejected">Đã khóa</span>}</td>
                       <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                        {t.is_active && (
+                          <button 
+                            className="btn btn--primary" 
+                            style={{ padding: '4px 9px', fontSize: 12, marginRight: 6, opacity: activeTenant?.id === t.id ? 0.6 : 1 }} 
+                            onClick={() => handleManage(t)}
+                            disabled={activeTenant?.id === t.id}
+                          >
+                            {activeTenant?.id === t.id ? 'Đang quản lý' : 'Quản lý'}
+                          </button>
+                        )}
                         <button className="btn btn--secondary" style={{ padding: '4px 9px', fontSize: 12, marginRight: 6 }} onClick={() => setModal({ kind: 'edit', id: t.id, form: { name: t.name, plan: t.plan, max_employees: t.max_employees } })}><Pencil size={13} /></button>
                         <button className={`btn ${t.is_active ? 'btn--danger' : 'btn--secondary'}`} style={{ padding: '4px 9px', fontSize: 12 }} onClick={() => toggle(t)}>{t.is_active ? <Lock size={13} /> : <Unlock size={13} />}</button>
                       </td>

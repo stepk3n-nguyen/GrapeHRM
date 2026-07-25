@@ -427,11 +427,16 @@ def update_employee(emp_id):
 
     db.session.flush()
 
+    from app.models.user import User
+    user = User.query.filter_by(employee_id=emp.id).first()
+    
+    if user:
+        # Sync the email to the user account
+        user.email = emp.work_email or f"{user.username}@grapecorp.com"
+
     # Handle role update if user is admin
     role = data.get("role")
     if role and get_jwt().get("role") == "admin":
-        from app.models.user import User
-        user = User.query.filter_by(employee_id=emp.id).first()
         if user:
             user.role = role
         else:

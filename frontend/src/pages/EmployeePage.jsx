@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 
 const EmployeePage = () => {
-  const { getAuthHeaders, user } = useAuth();
+  const { authFetch, user } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,9 +63,8 @@ const EmployeePage = () => {
 
   const fetchTitles = async () => {
     try {
-      const response = await fetch('/api/job-titles', {
+      const response = await authFetch('/api/job-titles', {
         method: 'GET',
-        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
@@ -78,9 +77,8 @@ const EmployeePage = () => {
 
   const fetchDepartments = async () => {
     try {
-      const response = await fetch('/api/departments', {
+      const response = await authFetch('/api/departments', {
         method: 'GET',
-        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
@@ -93,7 +91,7 @@ const EmployeePage = () => {
 
   const fetchShifts = async () => {
     try {
-      const response = await fetch('/api/work-shifts', { headers: getAuthHeaders() });
+      const response = await authFetch('/api/work-shifts');
       if (response.ok) setShifts(await response.json());
     } catch (err) {
       console.error('Fetch shifts error:', err);
@@ -103,9 +101,8 @@ const EmployeePage = () => {
   const fetchEmployees = async () => {
     setLoading(true);
     try {
-      const response = await fetch('/api/employees', {
+      const response = await authFetch('/api/employees', {
         method: 'GET',
-        headers: getAuthHeaders(),
       });
       if (response.ok) {
         const data = await response.json();
@@ -143,7 +140,7 @@ const EmployeePage = () => {
     setEditEmployee(null);
     let nextId = '';
     try {
-      const response = await fetch('/api/employees/next-id', { headers: getAuthHeaders() });
+      const response = await authFetch('/api/employees/next-id');
       if (response.ok) {
         const data = await response.json();
         nextId = data.next_id;
@@ -218,9 +215,8 @@ const EmployeePage = () => {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
-        headers: getAuthHeaders(),
         body: JSON.stringify(payload),
       });
       const contentType = response.headers.get("content-type");
@@ -247,9 +243,8 @@ const EmployeePage = () => {
     if (!isConfirmed) return;
 
     try {
-      const response = await fetch(`/api/employees/${emp.id}`, {
+      const response = await authFetch(`/api/employees/${emp.id}`, {
         method: 'DELETE',
-        headers: getAuthHeaders(),
       });
       if (response.ok) {
         showToast('Xóa nhân viên thành công!', 'success');
@@ -276,9 +271,8 @@ const EmployeePage = () => {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
-        headers: getAuthHeaders(),
         body: JSON.stringify(titleFormData),
       });
       if (response.ok) {
@@ -297,7 +291,7 @@ const EmployeePage = () => {
   const handleDeleteTitle = async (pos) => {
     if (!window.confirm(`Xóa chức vụ "${pos.name}"?`)) return;
     try {
-      const response = await fetch(`/api/job-titles/${pos.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const response = await authFetch(`/api/job-titles/${pos.id}`, { method: 'DELETE' });
       if (response.ok) {
         showToast('Xóa chức vụ thành công', 'success');
         fetchTitles();
@@ -322,9 +316,8 @@ const EmployeePage = () => {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const response = await fetch(url, {
+      const response = await authFetch(url, {
         method,
-        headers: getAuthHeaders(),
         body: JSON.stringify(deptFormData),
       });
       if (response.ok) {
@@ -343,7 +336,7 @@ const EmployeePage = () => {
   const handleDeleteDepartment = async (dept) => {
     if (!window.confirm(`Xóa phòng ban "${dept.name}"?`)) return;
     try {
-      const response = await fetch(`/api/departments/${dept.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const response = await authFetch(`/api/departments/${dept.id}`, { method: 'DELETE' });
       if (response.ok) {
         showToast('Xóa phòng ban thành công', 'success');
         fetchDepartments();
@@ -757,7 +750,7 @@ const EmployeePage = () => {
                 </div>
 
                 {/* Hàng Phân quyền (chỉ dành cho admin) */}
-                {user?.role === 'admin' && (
+                {(user?.role === 'admin' || user?.role === 'super_admin') && (
                   <div style={{ marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label className="form-label form-label--required" htmlFor="role">Vai trò hệ thống</label>

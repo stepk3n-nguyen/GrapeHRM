@@ -83,6 +83,12 @@ const AppContent = () => {
                   <Route path="/" element={<Navigate to="/profile" replace />} />
                   <Route path="*" element={<Navigate to="/profile" replace />} />
                 </>
+              ) : user?.role === 'super_admin' && !user?.tenant_id ? (
+                <>
+                  <Route path="/super-admin" element={<SuperAdminPage />} />
+                  <Route path="/profile" element={<ProfilePage />} />
+                  <Route path="*" element={<Navigate to="/super-admin" replace />} />
+                </>
               ) : (
                 <>
                   <Route path="/" element={<DashboardPage />} />

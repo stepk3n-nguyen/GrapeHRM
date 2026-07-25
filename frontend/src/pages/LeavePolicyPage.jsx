@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Plus, CheckCircle, Trash2, Edit, Loader2 } from 'lucide-react';
 
 const LeavePolicyPage = () => {
-  const { getAuthHeaders, user } = useAuth();
+  const { authFetch, user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   const [activeTab, setActiveTab] = useState('types'); // 'types', 'policies'
 
@@ -36,9 +36,9 @@ const LeavePolicyPage = () => {
     setLoading(true);
     try {
       const [typesRes, policiesRes, empRes] = await Promise.all([
-        fetch('/api/leave-types', { headers: getAuthHeaders() }),
-        fetch('/api/leave-policies', { headers: getAuthHeaders() }),
-        fetch('/api/employees', { headers: getAuthHeaders() })
+        authFetch('/api/leave-types'),
+        authFetch('/api/leave-policies'),
+        authFetch('/api/employees')
       ]);
       if (typesRes.ok) setLeaveTypes(await typesRes.json());
       if (policiesRes.ok) setPolicies(await policiesRes.json());
@@ -62,8 +62,8 @@ const LeavePolicyPage = () => {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const res = await fetch(url, {
-        method, headers: getAuthHeaders(), body: JSON.stringify(typeForm)
+      const res = await authFetch(url, {
+        method, body: JSON.stringify(typeForm)
       });
       if (res.ok) {
         showToast(isEdit ? 'Cập nhật thành công' : 'Thêm mới thành công');
@@ -79,7 +79,7 @@ const LeavePolicyPage = () => {
   const handleDeleteType = async (typeId) => {
     if (!window.confirm('Bạn có chắc chắn muốn xóa loại phép này?')) return;
     try {
-      const res = await fetch(`/api/leave-types/${typeId}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const res = await authFetch(`/api/leave-types/${typeId}`, { method: 'DELETE' });
       if (res.ok) { showToast('Xóa thành công'); fetchData(); }
       else showToast('Lỗi hệ thống', 'error');
     } catch (err) { showToast('Lỗi mạng', 'error'); }
@@ -95,8 +95,8 @@ const LeavePolicyPage = () => {
     const method = isEdit ? 'PUT' : 'POST';
 
     try {
-      const res = await fetch(url, {
-        method, headers: getAuthHeaders(), body: JSON.stringify(policyForm)
+      const res = await authFetch(url, {
+        method, body: JSON.stringify(policyForm)
       });
       if (res.ok) {
         showToast(isEdit ? 'Cập nhật chính sách thành công' : 'Tạo chính sách thành công');
@@ -116,7 +116,7 @@ const LeavePolicyPage = () => {
     }
     if (!window.confirm(`Bạn có chắc chắn muốn xóa chính sách "${policy.name}"?`)) return;
     try {
-      const res = await fetch(`/api/leave-policies/${policy.id}`, { method: 'DELETE', headers: getAuthHeaders() });
+      const res = await authFetch(`/api/leave-policies/${policy.id}`, { method: 'DELETE' });
       if (res.ok) { showToast('Xóa chính sách thành công'); fetchData(); }
       else {
         const d = await res.json();
@@ -133,8 +133,8 @@ const LeavePolicyPage = () => {
     }
 
     try {
-      const res = await fetch(`/api/leave-policies/${assignForm.policy_id}/assign`, {
-        method: 'POST', headers: getAuthHeaders(), body: JSON.stringify(assignForm)
+      const res = await authFetch(`/api/leave-policies/${assignForm.policy_id}/assign`, {
+        method: 'POST', body: JSON.stringify(assignForm)
       });
       if (res.ok) {
         showToast('Gán chính sách thành công');

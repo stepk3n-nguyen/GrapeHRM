@@ -3,7 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Save, Send, CheckCircle, Loader2 } from 'lucide-react';
 
 const EmailSettingsPage = () => {
-  const { getAuthHeaders, user } = useAuth();
+  const { authFetch, user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
   
   const [loading, setLoading] = useState(false);
@@ -30,7 +30,7 @@ const EmailSettingsPage = () => {
   const fetchConfig = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/smtp-config', { headers: getAuthHeaders() });
+      const res = await authFetch('/api/admin/smtp-config');
       if (res.ok) {
         const result = await res.json();
         const data = result.data || {};
@@ -64,9 +64,8 @@ const EmailSettingsPage = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/smtp-config', {
+      const res = await authFetch('/api/admin/smtp-config', {
         method: 'PUT',
-        headers: getAuthHeaders(),
         body: JSON.stringify(form)
       });
       if (res.ok) {
@@ -90,9 +89,8 @@ const EmailSettingsPage = () => {
     }
     setTesting(true);
     try {
-      const res = await fetch('/api/admin/smtp-test', {
+      const res = await authFetch('/api/admin/smtp-test', {
         method: 'POST',
-        headers: getAuthHeaders(),
         body: JSON.stringify({ email: testEmail })
       });
       if (res.ok) {

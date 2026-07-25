@@ -361,7 +361,7 @@ def create_request():
         if total_days > remaining:
             return jsonify({"error": f"Vượt quỹ phép: chỉ còn {remaining:g} ngày, bạn đang xin {total_days:g} ngày"}), 400
 
-    initial_status = "APPROVED" if role == "hr_manager" else "PENDING_HR"
+    initial_status = "PENDING_HR"
 
     req = LeaveRequest(
         tenant_id=g.tenant_id,
@@ -374,13 +374,13 @@ def create_request():
         status=initial_status
     )
     db.session.add(req)
-    
+        
     # Nếu HR tự xin nghỉ, thêm log phê duyệt tự động
-    if initial_status == "APPROVED":
-        db.session.flush() # Lấy id của req trước
-        user_id = get_jwt_identity()
-        log = LeaveApprovalLog(request_id=req.id, approver_id=user_id, action="APPROVED", comment="Hệ thống tự động duyệt cho HR")
-        db.session.add(log)
+        # if initial_status == "APPROVED":
+        #     db.session.flush() # Lấy id của req trước
+        #     user_id = get_jwt_identity()
+        #     log = LeaveApprovalLog(request_id=req.id, approver_id=user_id, action="APPROVED", comment="Hệ thống tự động duyệt cho HR")
+        #     db.session.add(log)
         
     db.session.commit()
     
@@ -491,6 +491,10 @@ def reject_request(req_id):
     
     data = request.get_json(silent=True) or {}
     reason = data.get("comment", "")
+    
+    role = get_jwt().get("role")
+    if req.end_date < date.today() and role not in ["admin", "super_admin"]:
+        return jsonify({"error": "Đơn đã quá hạn (chỉ Admin/Super Admin mới có quyền từ chối)"}), 400
     
     was_approved = req.status == "APPROVED"
     req.status = "REJECTED"

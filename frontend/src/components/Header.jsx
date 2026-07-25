@@ -4,7 +4,7 @@ import { LogOut, Menu, User } from 'lucide-react';
 import logoIcon from '../assets/img/logo-white-trans-full.svg';
 
 const Header = ({ onToggleSidebar }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, activeTenant } = useAuth();
 
   return (
     <header className="header">
@@ -17,9 +17,18 @@ const Header = ({ onToggleSidebar }) => {
         >
           <Menu size={20} />
         </button>
-        <div className="header__logo" style={{ justifyContent: 'flex-start', background: 'transparent', padding: 0 }}>
-          <img src={logoIcon} alt="G" style={{ width: '800%', height: '100%', objectFit: 'contain' }} />
+        <div className="header__logo" style={{ justifyContent: 'flex-start', background: 'transparent', padding: 0, display: 'flex', alignItems: 'center', width: 'auto' }}>
+          <img src={logoIcon} alt="G" style={{ height: '28px', width: 'auto', objectFit: 'contain' }} />
         </div>
+        
+        {/* Render tenant name */}
+        {( (user?.role === 'super_admin' && activeTenant?.name) || (user?.role !== 'super_admin' && user?.tenant_name) ) && (
+          <div style={{ marginLeft: '16px', paddingLeft: '20px', borderLeft: '1px solid rgba(255,255,255,0.2)', color: 'white', display: 'flex', alignItems: 'center' }}>
+            <span style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '0.3px' }}>
+              {user?.role === 'super_admin' ? activeTenant.name : user.tenant_name}
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="header__nav">

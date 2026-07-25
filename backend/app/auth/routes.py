@@ -46,25 +46,35 @@ def login():
         return jsonify({"error": "Vui lòng nhập username và password"}), 400
 
     if not tenant_slug:
-        return jsonify({"error": "Vui lòng nhập mã tổ chức"}), 400
+        # Nếu không có tenant_slug, kiểm tra xem có phải super_admin không
+        user = User.query.filter_by(username=username, role="super_admin", is_active=True).first()
+        if user is None or not user.check_password(password):
+            return jsonify({"error": "Vui lòng nhập mã tổ chức hoặc sai thông tin đăng nhập"}), 401
+        
+        # Đăng nhập super admin không gắn với tenant nào
+        tenant = None
+    else:
+        # Xác định tổ chức theo slug TRƯỚC khi tìm user
+        tenant = Tenant.query.filter_by(slug=tenant_slug, is_active=True).first()
+        if tenant is None:
+            return jsonify({"error": "Tổ chức không tồn tại hoặc đã bị vô hiệu hóa"}), 404
 
-    # Xác định tổ chức theo slug TRƯỚC khi tìm user — tránh trùng username
-    # giữa các tenant (2 công ty cùng có tài khoản "admin").
-    tenant = Tenant.query.filter_by(slug=tenant_slug, is_active=True).first()
-    if tenant is None:
-        return jsonify({"error": "Tổ chức không tồn tại hoặc đã bị vô hiệu hóa"}), 404
+        # Tìm user trong đúng tenant đã xác định
+        user = User.query.filter_by(
+            username=username, tenant_id=tenant.id, is_active=True
+        ).first()
 
-    # Tìm user trong đúng tenant đã xác định
-    user = User.query.filter_by(
-        username=username, tenant_id=tenant.id, is_active=True
-    ).first()
+        if user and user.role == "super_admin":
+            return jsonify({"error": "Sai tên đăng nhập hoặc mật khẩu"}), 401
 
-    if user is None or not user.check_password(password):
-        return jsonify({"error": "Sai tên đăng nhập hoặc mật khẩu"}), 401
+        if user is None or not user.check_password(password):
+            return jsonify({"error": "Sai tên đăng nhập hoặc mật khẩu"}), 401
 
     # Tạo custom claims chứa tenant_id và role — middleware sẽ đọc claims này
+    # Đối với super admin chưa chọn tổ chức, tenant_id có thể là None
+    effective_tenant_id = tenant.id if tenant else None
     additional_claims = {
-        "tenant_id": user.tenant_id,
+        "tenant_id": effective_tenant_id,
         "role": user.role,
         "username": user.username,
     }
@@ -91,7 +101,8 @@ def login():
     # Cập nhật thời điểm đăng nhập cuối + ghi nhật ký
     user.last_login = datetime.now(timezone.utc)
     from app.services.audit_service import log_action
-    log_action("LOGIN", "USER", user.id, tenant_id=user.tenant_id, user_id=user.id)
+    # super_admin khi đăng nhập có thể không có tenant_id, audit log nên để tenant_id là None nếu không thuộc tenant
+    log_action("LOGIN", "USER", user.id, tenant_id=effective_tenant_id, user_id=user.id)
     db.session.commit()
 
     employee_full_name = None
@@ -110,10 +121,64 @@ def login():
             "username": user.username,
             "email": user.email,
             "role": user.role,
-            "tenant_id": user.tenant_id,
+            "tenant_id": effective_tenant_id,
+            "tenant_name": user.tenant.name if user.tenant else None,
             "employee_full_name": employee_full_name,
             "employee_code": employee_code,
         },
+    }), 200
+
+@auth_bp.route("/switch-tenant", methods=["POST"])
+@jwt_required()
+def switch_tenant():
+    """
+    Super Admin chuyển đổi giữa các tenant.
+    Trả về token mới với tenant_id mới.
+    """
+    claims = get_jwt()
+    if claims.get("role") != "super_admin":
+        return jsonify({"error": "Chỉ Super Admin mới có quyền đổi tổ chức"}), 403
+
+    data = request.get_json(silent=True) or {}
+    tenant_id = data.get("tenant_id")
+
+    user_id = get_jwt_identity()
+    user = User.query.get(user_id)
+    if not user or not user.is_active:
+        return jsonify({"error": "Tài khoản không hợp lệ"}), 401
+
+    effective_tenant_id = None
+    if tenant_id is not None:
+        tenant = Tenant.query.filter_by(id=tenant_id, is_active=True).first()
+        if not tenant:
+            return jsonify({"error": "Tổ chức không tồn tại hoặc đã bị khóa"}), 404
+        effective_tenant_id = tenant.id
+
+    additional_claims = {
+        "tenant_id": effective_tenant_id,
+        "role": user.role,
+        "username": user.username,
+    }
+
+    access_expires = timedelta(minutes=current_app.config.get("JWT_ACCESS_TOKEN_EXPIRES", 30))
+    refresh_expires = timedelta(days=current_app.config.get("JWT_REFRESH_TOKEN_EXPIRES", 7))
+
+    access_token = create_access_token(
+        identity=str(user.id),
+        additional_claims=additional_claims,
+        expires_delta=access_expires,
+    )
+    refresh_token = create_refresh_token(
+        identity=str(user.id),
+        additional_claims=additional_claims,
+        expires_delta=refresh_expires,
+    )
+
+    return jsonify({
+        "message": "Chuyển tổ chức thành công",
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "tenant_id": effective_tenant_id
     }), 200
 
 
@@ -174,6 +239,7 @@ def me():
         "email": user.email,
         "role": user.role,
         "tenant_id": user.tenant_id,
+        "tenant_name": user.tenant.name if user.tenant else None,
         "last_login": user.last_login.isoformat() if user.last_login else None,
         "employee_full_name": employee_full_name,
         "employee_code": employee_code,

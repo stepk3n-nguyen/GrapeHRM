@@ -10,13 +10,13 @@ import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pi
 // Dashboard xoay quanh CHẤM CÔNG: hôm nay ai đi làm / muộn / nghỉ / vắng
 // và tổng công tháng hiện tại (tính động từ dữ liệu chấm công).
 const DashboardPage = () => {
-  const { user, getAuthHeaders } = useAuth();
+  const { user, authFetch } = useAuth();
   const [stats, setStats] = useState(null);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await fetch('/api/reports/dashboard-stats', { headers: getAuthHeaders() });
+        const res = await authFetch('/api/reports/dashboard-stats');
         if (res.ok) setStats(await res.json());
       } catch (err) { console.error(err); }
     };
@@ -51,7 +51,7 @@ const DashboardPage = () => {
       <div className="breadcrumb"><span>GrapeHRM</span><span>&gt;</span><span className="breadcrumb__item">Dashboard</span></div>
 
       <div style={{ marginBottom: '24px' }}>
-        <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Xin chào, {user ? user.username : 'HR Manager'}!</h2>
+        <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Xin chào, {user ? (user.employee_full_name || user.username) : 'HR Manager'}!</h2>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '14px', marginTop: '4px' }}>
           Tình hình chấm công hôm nay {today.date ? `(${new Date(today.date).toLocaleDateString('vi-VN')})` : ''} và tổng công tháng hiện tại.
         </p>

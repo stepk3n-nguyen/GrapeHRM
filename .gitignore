@@ -23,3 +23,4 @@ backend/test_*.py
 # Build artifacts
 frontend/dist/
 *.tar.gz
+TIEN_DO_DU_AN.md

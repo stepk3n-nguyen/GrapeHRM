@@ -156,7 +156,7 @@ const WorkConfigPage = () => {
       <div style={{ marginBottom: '20px' }}>
         <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Cấu hình chấm công</h2>
         <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginTop: '4px' }}>
-          Khai báo địa điểm (phạm vi geofence) và ca làm để hệ thống tự kiểm tra vị trí & tính đi muộn.
+          Khai báo mạng văn phòng (IP whitelist) và ca làm để hệ thống xác thực kết nối & tính đi muộn.
         </p>
       </div>
 

@@ -141,7 +141,6 @@ GrapeHRM/
 │   └── migration_2026_07_attendance_refactor.sql  # Migration tham khảo cho DB cũ
 ├── README.md
 ├── HUONG_DAN_SU_DUNG.md           # Hướng dẫn sử dụng & kịch bản test chi tiết
-├── TIEN_DO_DU_AN.md               # Tiến độ dự án
 └── descriptions.md                # Mô tả tổng quan quy trình HRM
 ```
 
@@ -251,5 +250,4 @@ Mở app từ điện thoại qua `http://<địa-chỉ-IP>:3000` sẽ bị trì
 ## Tài liệu bổ sung
 
 - [HUONG_DAN_SU_DUNG.md](HUONG_DAN_SU_DUNG.md) — Hướng dẫn sử dụng theo vai trò & kịch bản test end-to-end
-- [TIEN_DO_DU_AN.md](TIEN_DO_DU_AN.md) — Tiến độ phát triển dự án
 - [descriptions.md](descriptions.md) — Mô tả tổng quan quy trình HRM & flowchart

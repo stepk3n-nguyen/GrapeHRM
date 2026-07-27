@@ -522,6 +522,12 @@ def cancel_request(req_id):
     if req.status != "PENDING_HR":
         return jsonify({"error": "Chỉ có thể hủy khi đang chờ duyệt"}), 400
         
+    claims = get_jwt()
+    if claims.get("role") not in ["super_admin", "admin", "hr_manager"]:
+        emp = _current_employee()
+        if not emp or req.employee_id != emp.id:
+            return jsonify({"error": "Chỉ có thể hủy đơn của chính mình"}), 403
+        
     req.status = "CANCELLED"
     db.session.commit()
     

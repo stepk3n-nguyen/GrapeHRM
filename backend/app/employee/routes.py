@@ -349,6 +349,17 @@ def update_employee(emp_id):
     if not emp:
         return jsonify({"error": "Không tìm thấy hồ sơ nhân viên"}), 404
 
+    claims = get_jwt()
+    is_hr_admin = claims.get("role") in ["super_admin", "admin", "hr_manager"]
+    
+    from app.models.user import User
+    user = User.query.filter_by(employee_id=emp.id).first()
+
+    if not is_hr_admin:
+        current_user = User.query.get(get_jwt_identity())
+        if not current_user or current_user.employee_id != emp.id:
+            return jsonify({"error": "Không có quyền cập nhật hồ sơ của người khác"}), 403
+
     data = request.get_json(silent=True)
     if not data:
         return jsonify({"error": "Thiếu dữ liệu cập nhật"}), 400
@@ -361,96 +372,100 @@ def update_employee(emp_id):
     if last_name:
         emp.last_name = last_name
 
-    # Cập nhật các trường còn lại nếu có truyền lên
-    if "employee_id" in data:
-        new_code = data.get("employee_id", "").strip() or None
-        if new_code and new_code != emp.employee_id:
-            dup = Employee.query.filter_by(tenant_id=tenant_id, employee_id=new_code).filter(Employee.id != emp.id).first()
-            if dup:
-                return jsonify({"error": f"Mã nhân viên {new_code} đã tồn tại"}), 400
-        emp.employee_id = new_code
+    # Cập nhật các trường admin-only
+    if is_hr_admin:
+        if "employee_id" in data:
+            new_code = data.get("employee_id", "").strip() or None
+            if new_code and new_code != emp.employee_id:
+                dup = Employee.query.filter_by(tenant_id=tenant_id, employee_id=new_code).filter(Employee.id != emp.id).first()
+                if dup:
+                    return jsonify({"error": f"Mã nhân viên {new_code} đã tồn tại"}), 400
+            emp.employee_id = new_code
+
+        if "work_email" in data:
+            new_email = data.get("work_email", "").strip() or None
+            if new_email and new_email != emp.work_email:
+                dup = Employee.query.filter_by(tenant_id=tenant_id, work_email=new_email).filter(Employee.id != emp.id).first()
+                if dup:
+                    return jsonify({"error": f"Email {new_email} đã được dùng cho nhân viên khác"}), 400
+            emp.work_email = new_email
+
+        if "joined_date" in data:
+            emp.joined_date = parse_date(data.get("joined_date"))
+        if "end_date" in data:
+            emp.end_date = parse_date(data.get("end_date"))
+            
+        # Auto calc state
+        if emp.end_date:
+            from datetime import date
+            emp.state = "TERMINATED" if emp.end_date <= date.today() else "ACTIVE"
+        else:
+            emp.state = "ACTIVE"
+                
+        if "title_id" in data:
+            t_id = data.get("title_id")
+            try:
+                emp.title_id = int(t_id) if t_id else None
+            except ValueError:
+                pass
+                
+        if "department_id" in data:
+            d_id = data.get("department_id")
+            try:
+                emp.department_id = int(d_id) if d_id else None
+            except ValueError:
+                pass
+                
+        if "shift_id" in data:
+            s_id = data.get("shift_id")
+            try:
+                emp.shift_id = int(s_id) if s_id else None
+            except ValueError:
+                pass
+                
+        # Handle role update if user is admin
+        role = data.get("role")
+        if role and claims.get("role") == "admin":
+            if user:
+                user.role = role
+            else:
+                username = emp.employee_id.replace("-", "").lower() if emp.employee_id else f"nv{emp.id}"
+                user = User(
+                    tenant_id=tenant_id,
+                    employee_id=emp.id,
+                    username=username,
+                    email=emp.work_email or f"{username}@grapecorp.com",
+                    role=role,
+                    is_active=True
+                )
+                user.set_password("123456")
+                db.session.add(user)
+
+    # Cập nhật các trường self-service
     if "gender" in data:
         gender = data.get("gender")
         emp.gender = int(gender) if gender is not None else None
     if "marital_status" in data:
         emp.marital_status = data.get("marital_status", "").strip() or None
-    if "birthday" in data:
-        emp.birthday = parse_date(data.get("birthday"))
-    if "mobile" in data:
-        emp.mobile = data.get("mobile", "").strip() or None
-    if "work_email" in data:
-        new_email = data.get("work_email", "").strip() or None
-        if new_email and new_email != emp.work_email:
-            dup = Employee.query.filter_by(tenant_id=tenant_id, work_email=new_email).filter(Employee.id != emp.id).first()
-            if dup:
-                return jsonify({"error": f"Email {new_email} đã được dùng cho nhân viên khác"}), 400
-        emp.work_email = new_email
-    if "joined_date" in data:
-        emp.joined_date = parse_date(data.get("joined_date"))
-    if "end_date" in data:
-        emp.end_date = parse_date(data.get("end_date"))
-    if "address" in data:
-        emp.address = data.get("address", "").strip() or None
-        
-    # Auto calc state
-    if emp.end_date:
-        from datetime import date
-        emp.state = "TERMINATED" if emp.end_date <= date.today() else "ACTIVE"
-    else:
-        emp.state = "ACTIVE"
-
     if "num_dependents" in data:
         try:
             emp.num_dependents = max(int(data.get("num_dependents") or 0), 0)
         except (ValueError, TypeError):
             pass
+    if "birthday" in data:
+        emp.birthday = parse_date(data.get("birthday"))
+    if "mobile" in data:
+        emp.mobile = data.get("mobile", "").strip() or None
+    if "address" in data:
+        emp.address = data.get("address", "").strip() or None
     if "profile_pic_url" in data:
         emp.profile_pic_url = data.get("profile_pic_url", "").strip() or None
-    if "title_id" in data:
-        t_id = data.get("title_id")
-        try:
-            emp.title_id = int(t_id) if t_id else None
-        except ValueError:
-            pass
-    if "department_id" in data:
-        d_id = data.get("department_id")
-        try:
-            emp.department_id = int(d_id) if d_id else None
-        except ValueError:
-            pass
-    if "shift_id" in data:
-        s_id = data.get("shift_id")
-        try:
-            emp.shift_id = int(s_id) if s_id else None
-        except ValueError:
-            pass
 
     db.session.flush()
 
-    from app.models.user import User
-    user = User.query.filter_by(employee_id=emp.id).first()
-    
-    if user:
+    if user and is_hr_admin:
         # Sync the email to the user account
         user.email = emp.work_email or f"{user.username}@grapecorp.com"
-
-    # Handle role update if user is admin
-    role = data.get("role")
-    if role and get_jwt().get("role") == "admin":
-        if user:
-            user.role = role
-        else:
-            username = emp.employee_id.replace("-", "").lower() if emp.employee_id else f"nv{emp.id}"
-            user = User(
-                tenant_id=tenant_id,
-                employee_id=emp.id,
-                username=username,
-                email=emp.work_email or f"{username}@grapecorp.com",
-                role=role,
-                is_active=True
-            )
-            user.set_password("123456")
-            db.session.add(user)
 
     db.session.commit()
 

@@ -271,6 +271,10 @@ def self_check_in():
     att = Attendance.query.filter_by(employee_id=emp.id, date=today).first()
     if att and att.check_in:
         return jsonify({"error": "Bạn đã chấm công vào hôm nay rồi"}), 400
+    if att and att.status == "ON_LEAVE":
+        return jsonify({
+            "error": "Bạn đang trong thời gian nghỉ phép đã được duyệt. Vui lòng hủy đơn nghỉ phép trước khi chấm công."
+        }), 400
 
     now = datetime.now()
     shift = svc.resolve_shift(emp)  # ca gán riêng hoặc ca mặc định

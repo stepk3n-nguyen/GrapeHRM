@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Plus, Check, X as XIcon, Loader2, AlertTriangle, CheckCircle, Calendar, CalendarDays } from 'lucide-react';
+import { Plus, Check, X as XIcon, Loader2, AlertTriangle, CheckCircle, Calendar, CalendarDays, Trash2 } from 'lucide-react';
 
 const LeavePage = () => {
   const { user, authFetch } = useAuth();
@@ -12,6 +12,7 @@ const LeavePage = () => {
   
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [cancelReqId, setCancelReqId] = useState(null);
   const [formData, setFormData] = useState({
     leave_type_id: '',
     start_date: '',
@@ -142,6 +143,30 @@ const LeavePage = () => {
       }
     } catch (err) {
       showToast('Lỗi mạng', 'error');
+    }
+  };
+
+  const handleCancelRequest = (reqId) => {
+    setCancelReqId(reqId);
+  };
+
+  const confirmCancelRequest = async () => {
+    if (!cancelReqId) return;
+    try {
+      const response = await authFetch(`/api/leave-requests/${cancelReqId}/cancel`, {
+        method: 'PUT'
+      });
+      if (response.ok) {
+        showToast('Đã hủy đơn nghỉ phép');
+        fetchMyRequests();
+      } else {
+        const data = await response.json();
+        showToast(data.error || 'Lỗi thao tác', 'error');
+      }
+    } catch (err) {
+      showToast('Lỗi mạng', 'error');
+    } finally {
+      setCancelReqId(null);
     }
   };
 
@@ -280,6 +305,7 @@ const LeavePage = () => {
                         <th>Số ngày</th>
                         <th>Trạng thái</th>
                         <th>Ngày tạo</th>
+                        <th style={{ textAlign: 'right' }}>Thao tác</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -291,6 +317,13 @@ const LeavePage = () => {
                           <td>{req.total_days}</td>
                           <td>{renderStatus(req.status)}</td>
                           <td style={{ color: 'var(--color-text-muted)' }}>{new Date(req.created_at).toLocaleDateString('vi-VN')}</td>
+                          <td style={{ textAlign: 'right' }}>
+                            {req.status === 'PENDING_HR' && (
+                              <button className="btn btn--secondary" style={{ padding: '4px 9px', fontSize: 12 }} onClick={() => handleCancelRequest(req.id)} title="Hủy đơn">
+                                <Trash2 size={13} />
+                              </button>
+                            )}
+                          </td>
                         </tr>
                       ))}
                     </tbody>
@@ -405,6 +438,27 @@ const LeavePage = () => {
                 <button type="submit" className="btn btn--primary">Nộp đơn</button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {cancelReqId && (
+        <div className="modal-overlay">
+          <div className="modal" style={{ maxWidth: '400px' }}>
+            <div className="modal__header">
+              <h3 className="modal__title">Xác nhận hủy đơn</h3>
+              <button className="modal__close" onClick={() => setCancelReqId(null)}>&times;</button>
+            </div>
+            <div className="modal__body" style={{ padding: '24px 20px', textAlign: 'center' }}>
+              <AlertTriangle size={48} style={{ color: 'var(--color-warning)', margin: '0 auto 16px' }} />
+              <p style={{ fontSize: '15px', color: 'var(--color-text-main)' }}>
+                Bạn có chắc chắn muốn hủy đơn nghỉ phép này không?
+              </p>
+            </div>
+            <div className="modal__footer" style={{ justifyContent: 'center' }}>
+              <button type="button" className="btn btn--secondary" onClick={() => setCancelReqId(null)}>Không</button>
+              <button type="button" className="btn btn--danger" onClick={confirmCancelRequest}>Hủy đơn</button>
+            </div>
           </div>
         </div>
       )}

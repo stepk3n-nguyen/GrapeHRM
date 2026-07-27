@@ -48,6 +48,9 @@ const OvertimePage = () => {
   };
 
   const act = async (id, action) => {
+    if (action === 'delete') {
+      if (!window.confirm('Bạn có chắc chắn muốn hủy đơn này?')) return;
+    }
     const method = action === 'delete' ? 'DELETE' : 'PUT';
     const url = action === 'delete' ? `/api/overtime/${id}` : `/api/overtime/${id}/${action}`;
     const res = await authFetch(url, { method });

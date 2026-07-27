@@ -1,4 +1,4 @@
-                      # GrapeHRM — Hệ thống Quản lý Nhân sự đa tổ chức (multi-tenant)
+<h1> GrapeHRM — Hệ thống Quản lý Nhân sự đa tổ chức (multi-tenant) </h1>
 
 Ứng dụng HRM web cho nhiều công ty dùng chung một hệ thống (multi-tenant). Quản lý nhân sự,                                                                                                                                                                                                     
 chấm công bằng GPS/geofence, nghỉ phép, tính lương và phiếu lương, báo cáo, nhật ký kiểm toán.

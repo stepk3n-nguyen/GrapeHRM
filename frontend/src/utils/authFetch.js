@@ -9,15 +9,15 @@ const processQueue = (error, token = null) => {
       prom.resolve(token);
     }
   });
-  
+
   failedQueue = [];
 };
 
 export function createAuthFetch(getToken, setToken, logout) {
   return async function authFetch(url, options = {}) {
-    // 1. Get current access token
+    // 1. lấy accsess token hiện tại
     const accessToken = getToken();
-    
+
     // 2. Setup headers
     const headers = {
       'Content-Type': 'application/json',
@@ -33,36 +33,36 @@ export function createAuthFetch(getToken, setToken, logout) {
       headers
     };
 
-    // 3. Make the initial request
+    // 3. tạo initial request
     let response = await fetch(url, config);
 
-    // 4. If 401 Unauthorized, handle token refresh
+    // 4. nếu 401 Unauthorized, xử lý token refresh
     if (response.status === 401) {
       const refreshToken = localStorage.getItem('refresh_token');
-      
-      // If no refresh token, we can't do anything but logout
+
+      // nếu không có refresh token, không thể làm gì khác ngoài logout
       if (!refreshToken) {
         logout();
         return response;
       }
 
       if (isRefreshing) {
-        // If already refreshing, wait for it to finish
+        // nếu đã có refresh, chờ nó hoàn thành
         try {
           const newToken = await new Promise((resolve, reject) => {
             failedQueue.push({ resolve, reject });
           });
-          
-          // Retry the original request with the new token
+
+          // retry request ban đầu với token mới
           config.headers['Authorization'] = `Bearer ${newToken}`;
           return await fetch(url, config);
         } catch (err) {
-          // If the queued refresh failed, return the original 401 response
+          // nếu refresh bị lỗi, trả về 401 response ban đầu
           return response;
         }
       }
 
-      // Start the refresh process
+      // bắt đầu quá trình refresh
       isRefreshing = true;
       try {
         const refreshResponse = await fetch('/api/auth/refresh', {
@@ -76,19 +76,19 @@ export function createAuthFetch(getToken, setToken, logout) {
         if (refreshResponse.ok) {
           const data = await refreshResponse.json();
           const newAccessToken = data.access_token;
-          
-          // Save new token
+
+          // lưu token mới
           localStorage.setItem('access_token', newAccessToken);
           setToken(newAccessToken);
-          
-          // Process queue before retrying this request, so others can proceed
+
+          // xử lý queue trước khi retry request này, để các request khác cũng có thể proceed
           processQueue(null, newAccessToken);
-          
-          // Retry the original request with the new token
+
+          // retry request ban đầu với token mới
           config.headers['Authorization'] = `Bearer ${newAccessToken}`;
           response = await fetch(url, config);
         } else {
-          // Refresh failed (e.g. refresh token expired)
+          // refresh failed (e.g. refresh token expired)
           processQueue(new Error('Refresh failed'));
           logout();
         }

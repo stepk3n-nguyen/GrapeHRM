@@ -246,11 +246,11 @@ const WorkConfigPage = () => {
             </div>
           </div>
           <div className="card__body" style={{ padding: 0 }}>
-            <div style={{ padding: '10px 16px', fontSize: '12.5px', color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)' }}>
+            {/* <div style={{ padding: '10px 16px', fontSize: '12.5px', color: 'var(--color-text-muted)', borderBottom: '1px solid var(--color-border)' }}>
               Lịch nghỉ lễ là <b>của riêng công ty bạn</b> — có thể theo đúng lịch nhà nước, ít hơn, nhiều hơn, hoặc bỏ trống.
               Bấm "Nạp lễ VN" để lấy nhanh lịch nhà nước rồi tự chỉnh. Ngày lễ được loại khỏi <b>ngày công chuẩn</b> khi
               tính lương và <b>không bị trừ</b> vào quỹ phép nếu đơn nghỉ trùng ngày lễ.
-            </div>
+            </div> */}
             <div className="table-responsive">
               <table className="table table--zebra">
                 <thead><tr><th>Ngày</th><th>Thứ</th><th>Tên ngày lễ</th><th>Hưởng lương</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>

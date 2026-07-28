@@ -4,7 +4,7 @@ const Footer = () => {
   const currentYear = new Date().getFullYear();
   return (
     <footer className="footer">
-      <p>&copy; {currentYear} GrapeHRM. Tất cả quyền được bảo lưu. Thiết kế theo tiêu chuẩn cao cấp.</p>
+      <p>&copy; {currentYear} GrapeHRM. Quản trị nhân sự thế hệ mới.</p>
     </footer>
   );
 };

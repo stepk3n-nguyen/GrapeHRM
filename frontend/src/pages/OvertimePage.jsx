@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Clock4, Plus, Loader2, CheckCircle, Check, X, Trash2 } from 'lucide-react';
+import { Clock4, Plus, Loader2, CheckCircle, Check, X, Trash2, Edit2 } from 'lucide-react';
 
 const OT_TYPES = [
   { value: 'WEEKDAY', label: 'Ngày thường (150%)' },
@@ -21,6 +21,7 @@ const OvertimePage = () => {
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null); // null | { form }
   const [toasts, setToasts] = useState([]);
+  const [employees, setEmployees] = useState([]);
 
   const showToast = (m, type = 'success') => {
     const id = Date.now();
@@ -37,13 +38,31 @@ const OvertimePage = () => {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { fetchItems(); /* eslint-disable-next-line */ }, []);
+  const fetchEmployees = async () => {
+    if (!isHR) return;
+    try {
+      const res = await authFetch('/api/employees');
+      if (res.ok) {
+        const data = await res.json();
+        setEmployees(data.filter(e => e.state === 'ACTIVE'));
+      }
+    } catch { }
+  };
+
+  useEffect(() => { 
+    fetchItems(); 
+    if (isHR) fetchEmployees();
+    /* eslint-disable-next-line */ 
+  }, [isHR]);
 
   const submit = async (e) => {
     e.preventDefault();
-    const res = await authFetch('/api/overtime', { method: 'POST', body: JSON.stringify(modal.form) });
+    const isEdit = !!modal.form.id;
+    const url = isEdit ? `/api/overtime/${modal.form.id}` : '/api/overtime';
+    const method = isEdit ? 'PUT' : 'POST';
+    const res = await authFetch(url, { method, body: JSON.stringify(modal.form) });
     const data = await res.json();
-    if (res.ok) { showToast(data.message || 'Đã gửi.'); setModal(null); fetchItems(); }
+    if (res.ok) { showToast(data.message || 'Đã lưu.'); setModal(null); fetchItems(); }
     else showToast(data.error || 'Thất bại.', 'error');
   };
 
@@ -76,7 +95,7 @@ const OvertimePage = () => {
             {isHR ? `Duyệt đơn tăng ca — ${pending} đơn chờ. Tiền OT tự cộng vào bảng lương tháng.` : 'Đăng ký tăng ca; tiền OT sẽ cộng vào phiếu lương sau khi HR duyệt.'}
           </p>
         </div>
-        <button className="btn btn--primary" onClick={() => setModal({ form: { date: '', hours: 2, ot_type: 'WEEKDAY', reason: '' } })}><Plus size={16} /> Đăng ký tăng ca</button>
+        <button className="btn btn--primary" onClick={() => setModal({ form: { date: '', hours: 2, ot_type: 'WEEKDAY', reason: '', employee_id: '' } })}><Plus size={16} /> Đăng ký tăng ca</button>
       </div>
 
       <div className="card card--no-hover">
@@ -97,15 +116,34 @@ const OvertimePage = () => {
                         <td style={{ color: 'var(--color-text-muted)', maxWidth: 200 }}>{o.reason || '—'}</td>
                         <td><span className={`status-badge ${sb.cls}`}>{sb.text}</span></td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          {isHR && o.status === 'PENDING' && (
-                            <>
-                              <button className="btn btn--primary" style={{ padding: '4px 9px', fontSize: 12, marginRight: 6 }} onClick={() => act(o.id, 'approve')}><Check size={13} /></button>
-                              <button className="btn btn--danger" style={{ padding: '4px 9px', fontSize: 12, marginRight: 6 }} onClick={() => act(o.id, 'reject')}><X size={13} /></button>
-                            </>
-                          )}
-                          {o.status === 'PENDING' && (
-                            <button className="btn btn--secondary" style={{ padding: '4px 9px', fontSize: 12 }} onClick={() => act(o.id, 'delete')}><Trash2 size={13} /></button>
-                          )}
+                          <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end', alignItems: 'center' }}>
+                            {isHR && o.status === 'PENDING' && (
+                              <>
+                                <button className="btn btn--primary" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => act(o.id, 'approve')}><Check size={14} /></button>
+                                <button className="btn btn--danger" style={{ padding: '6px 10px', fontSize: 12 }} onClick={() => act(o.id, 'reject')}><X size={14} /></button>
+                              </>
+                            )}
+                            {isHR && (
+                              <button 
+                                className="btn" 
+                                style={{ padding: '6px 10px', backgroundColor: '#fff', border: '1px solid var(--color-primary)', color: 'var(--color-primary)', borderRadius: '6px' }} 
+                                onClick={() => setModal({ form: { id: o.id, date: o.date.split('T')[0], hours: o.hours, ot_type: o.ot_type, reason: o.reason || '', employee_id: o.employee_id } })}
+                                title="Sửa"
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                            )}
+                            {(isHR || o.status === 'PENDING') && (
+                              <button 
+                                className="btn btn--danger" 
+                                style={{ padding: '6px 10px', borderRadius: '6px', border: '1px solid transparent' }} 
+                                onClick={() => act(o.id, 'delete')}
+                                title="Xóa"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     );
@@ -122,11 +160,20 @@ const OvertimePage = () => {
         <div className="modal-overlay">
           <div className="modal" style={{ maxWidth: 440 }}>
             <div className="modal__header">
-              <h3 className="modal__title">Đăng ký tăng ca</h3>
+              <h3 className="modal__title">{modal.form.id ? 'Sửa đơn tăng ca' : 'Đăng ký tăng ca'}</h3>
               <button className="modal__close" onClick={() => setModal(null)}>&times;</button>
             </div>
             <form onSubmit={submit}>
               <div className="modal__body">
+                {isHR && (
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Nhân viên</label>
+                    <select className="input" value={modal.form.employee_id || ''} onChange={(e) => setModal({ form: { ...modal.form, employee_id: e.target.value } })} required>
+                      <option value="">-- Chọn nhân viên --</option>
+                      {employees.map(emp => <option key={emp.id} value={emp.id}>{emp.employee_id} - {emp.full_name}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="form-label form-label--required">Ngày tăng ca</label>
                   <input type="date" className="input" value={modal.form.date} onChange={(e) => setModal({ form: { ...modal.form, date: e.target.value } })} required />

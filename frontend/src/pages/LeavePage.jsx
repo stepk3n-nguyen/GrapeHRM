@@ -9,11 +9,13 @@ const LeavePage = () => {
   const [leaveBalances, setLeaveBalances] = useState([]);
   const [myRequests, setMyRequests] = useState([]);
   const [pendingRequests, setPendingRequests] = useState([]);
-  
+  const [employees, setEmployees] = useState([]);
+
   const [leaveTypes, setLeaveTypes] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [cancelReqId, setCancelReqId] = useState(null);
   const [formData, setFormData] = useState({
+    employee_id: '',
     leave_type_id: '',
     start_date: '',
     end_date: '',
@@ -87,6 +89,22 @@ const LeavePage = () => {
     fetchLeaveTypes();
   }, [activeTab, user?.employee_id]);
 
+  useEffect(() => {
+    if (isAdminOrHR) {
+      const fetchEmployees = async () => {
+        try {
+          const res = await authFetch('/api/employees');
+          if (res.ok) {
+            const data = await res.json();
+            setEmployees(data.filter(e => e.state === 'ACTIVE'));
+          }
+        } catch { }
+      };
+      fetchEmployees();
+    }
+    /* eslint-disable-next-line */
+  }, [isAdminOrHR]);
+
   // Tự động tính số ngày nghỉ (loại T7/CN — khớp với cách server tính)
   useEffect(() => {
     if (formData.start_date && formData.end_date) {
@@ -112,13 +130,13 @@ const LeavePage = () => {
     try {
       const response = await authFetch('/api/leave-requests', {
         method: 'POST',
-        body: JSON.stringify({ ...formData, employee_id: user.employee_id })
+        body: JSON.stringify({ ...formData, employee_id: formData.employee_id || user.employee_id })
       });
       const data = await response.json();
       if (response.ok) {
         showToast('Tạo đơn xin nghỉ thành công');
         setIsModalOpen(false);
-        setFormData({ leave_type_id: '', start_date: '', end_date: '', total_days: '', reason: '' });
+        setFormData({ employee_id: '', leave_type_id: '', start_date: '', end_date: '', total_days: '', reason: '' });
         fetchMyRequests();
         fetchLeaveBalances();
       } else {
@@ -188,7 +206,7 @@ const LeavePage = () => {
   };
 
   const renderStatus = (status) => {
-    switch(status) {
+    switch (status) {
       case 'PENDING_HR': return <span className="status-badge status-badge--warning">Chờ HR duyệt</span>;
       case 'APPROVED': return <span className="status-badge status-badge--approved">Đã duyệt</span>;
       case 'REJECTED': return <span className="status-badge status-badge--rejected">Từ chối</span>;
@@ -227,16 +245,14 @@ const LeavePage = () => {
             Quản lý ngày phép, tạo đơn nghỉ phép và phê duyệt đơn.
           </p>
         </div>
-        {activeTab === 'personal' && !isAdmin && (
-          <button className="btn btn--primary" onClick={() => setIsModalOpen(true)}>
-            <Plus size={16} /> Tạo đơn xin nghỉ
-          </button>
-        )}
+        <button className="btn btn--primary" onClick={() => setIsModalOpen(true)}>
+          <Plus size={16} /> Tạo đơn xin nghỉ
+        </button>
       </div>
 
       <div className="leave-tabs">
         {!isAdmin && (
-          <button 
+          <button
             className={`leave-tabs__tab ${activeTab === 'personal' ? 'leave-tabs__tab--active' : ''}`}
             onClick={() => setActiveTab('personal')}
           >
@@ -244,7 +260,7 @@ const LeavePage = () => {
           </button>
         )}
         {isAdminOrHR && (
-          <button 
+          <button
             className={`leave-tabs__tab ${activeTab === 'approval' ? 'leave-tabs__tab--active' : ''}`}
             onClick={() => setActiveTab('approval')}
           >
@@ -260,11 +276,11 @@ const LeavePage = () => {
               <div key={bal.type_id} className="card card--hover-blue">
                 <div className="card__body">
                   <h4 style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 600 }}>{bal.type_name}</h4>
-                  <div style={{ 
-                    fontSize: '28px', 
-                    fontWeight: 700, 
-                    color: (bal.entitlement > 0 && bal.remaining <= 0) ? 'var(--color-error)' : 'var(--color-primary)', 
-                    marginTop: '8px' 
+                  <div style={{
+                    fontSize: '28px',
+                    fontWeight: 700,
+                    color: (bal.entitlement > 0 && bal.remaining <= 0) ? 'var(--color-error)' : 'var(--color-primary)',
+                    marginTop: '8px'
                   }}>
                     {bal.remaining} <span style={{ fontSize: '14px', color: 'var(--color-text-muted)', fontWeight: 400 }}>ngày</span>
                   </div>
@@ -402,12 +418,26 @@ const LeavePage = () => {
             </div>
             <form onSubmit={handleSubmitRequest}>
               <div className="modal__body">
+                {isAdminOrHR && (
+                  <div className="form-group">
+                    <label className="form-label form-label--required">Nhân viên</label>
+                    <select
+                      className="input"
+                      value={formData.employee_id}
+                      onChange={e => setFormData({ ...formData, employee_id: e.target.value })}
+                      required
+                    >
+                      <option value="">-- Chọn nhân viên --</option>
+                      {employees.map(e => <option key={e.id} value={e.id}>{e.full_name} ({e.employee_code})</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="form-group">
                   <label className="form-label form-label--required">Loại nghỉ phép</label>
-                  <select 
-                    className="input" 
-                    value={formData.leave_type_id} 
-                    onChange={e => setFormData({...formData, leave_type_id: e.target.value})}
+                  <select
+                    className="input"
+                    value={formData.leave_type_id}
+                    onChange={e => setFormData({ ...formData, leave_type_id: e.target.value })}
                     required
                   >
                     <option value="">-- Chọn loại phép --</option>
@@ -417,11 +447,11 @@ const LeavePage = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                   <div className="form-group">
                     <label className="form-label form-label--required">Từ ngày</label>
-                    <input type="date" className="input" value={formData.start_date} onChange={e => setFormData({...formData, start_date: e.target.value})} min={getLocalDateStr()} required />
+                    <input type="date" className="input" value={formData.start_date} onChange={e => setFormData({ ...formData, start_date: e.target.value })} min={getLocalDateStr()} required />
                   </div>
                   <div className="form-group">
                     <label className="form-label form-label--required">Đến ngày</label>
-                    <input type="date" className="input" value={formData.end_date} onChange={e => setFormData({...formData, end_date: e.target.value})} min={formData.start_date || getLocalDateStr()} required />
+                    <input type="date" className="input" value={formData.end_date} onChange={e => setFormData({ ...formData, end_date: e.target.value })} min={formData.start_date || getLocalDateStr()} required />
                   </div>
                 </div>
                 <div className="form-group">
@@ -430,7 +460,7 @@ const LeavePage = () => {
                 </div>
                 <div className="form-group">
                   <label className="form-label">Lý do</label>
-                  <textarea className="input" rows="3" value={formData.reason} onChange={e => setFormData({...formData, reason: e.target.value})}></textarea>
+                  <textarea className="input" rows="3" value={formData.reason} onChange={e => setFormData({ ...formData, reason: e.target.value })}></textarea>
                 </div>
               </div>
               <div className="modal__footer">

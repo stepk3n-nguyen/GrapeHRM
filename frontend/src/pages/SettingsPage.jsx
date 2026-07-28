@@ -258,22 +258,31 @@ const SettingsPage = () => {
                           {u.last_login ? new Date(u.last_login).toLocaleString('vi-VN') : 'Chưa từng'}
                         </td>
                         <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button
-                            className={`btn ${u.is_active ? 'btn--danger' : 'btn--secondary'}`}
-                            style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }}
-                            onClick={() => toggleActive(u)}
-                            disabled={u.id === user?.id}
-                            title={u.id === user?.id ? 'Không thể tự khóa chính mình' : ''}
-                          >
-                            {u.is_active ? <><Lock size={13} /> Khóa</> : <><Unlock size={13} /> Mở</>}
-                          </button>
-                          <button
-                            className="btn btn--secondary"
-                            style={{ padding: '4px 10px', fontSize: '12px' }}
-                            onClick={() => resetPassword(u)}
-                          >
-                            <KeyRound size={13} /> Reset MK
-                          </button>
+                          {(() => {
+                            const cannotEdit = user?.role === 'admin' && u.role === 'super_admin';
+                            return (
+                              <>
+                                <button
+                                  className={`btn ${u.is_active ? 'btn--danger' : 'btn--secondary'}`}
+                                  style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px', opacity: cannotEdit ? 0.5 : 1 }}
+                                  onClick={() => toggleActive(u)}
+                                  disabled={u.id === user?.id || cannotEdit}
+                                  title={u.id === user?.id ? 'Không thể tự khóa chính mình' : (cannotEdit ? 'Admin không có quyền thao tác trên Super Admin' : '')}
+                                >
+                                  {u.is_active ? <><Lock size={13} /> Khóa</> : <><Unlock size={13} /> Mở</>}
+                                </button>
+                                <button
+                                  className="btn btn--secondary"
+                                  style={{ padding: '4px 10px', fontSize: '12px', opacity: cannotEdit ? 0.5 : 1 }}
+                                  onClick={() => resetPassword(u)}
+                                  disabled={cannotEdit}
+                                  title={cannotEdit ? 'Admin không có quyền thao tác trên Super Admin' : ''}
+                                >
+                                  <KeyRound size={13} /> Reset MK
+                                </button>
+                              </>
+                            );
+                          })()}
                         </td>
                       </tr>
                     ))}

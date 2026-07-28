@@ -189,6 +189,10 @@ def toggle_user_active(user_id):
     if not u:
         return jsonify({"error": "Không tìm thấy tài khoản"}), 404
 
+    current_role = get_jwt().get("role")
+    if current_role == "admin" and u.role == "super_admin":
+        return jsonify({"error": "Admin không có quyền khóa tài khoản của Super Admin"}), 403
+
     u.is_active = not u.is_active
     db.session.commit()
     state = "mở khóa" if u.is_active else "khóa"
@@ -205,6 +209,10 @@ def reset_user_password(user_id):
     u = User.query.filter_by(id=user_id, tenant_id=g.tenant_id).first()
     if not u:
         return jsonify({"error": "Không tìm thấy tài khoản"}), 404
+
+    current_role = get_jwt().get("role")
+    if current_role == "admin" and u.role == "super_admin":
+        return jsonify({"error": "Admin không có quyền reset mật khẩu của Super Admin"}), 403
 
     u.set_password("123456")
     db.session.commit()

@@ -492,10 +492,20 @@ def list_overtime():
 @jwt_required()
 def create_overtime():
     """Nhân viên đăng ký tăng ca cho CHÍNH MÌNH (server lấy employee từ token)."""
-    emp_id = _current_employee_id()
+    d = request.get_json(silent=True) or {}
+    
+    if _is_hr_admin() and d.get("employee_id"):
+        emp_id = d.get("employee_id")
+        from app.models.employee import Employee
+        emp = Employee.query.filter_by(id=emp_id, tenant_id=g.tenant_id).first()
+        if not emp:
+            return jsonify({"error": "Nhân viên không tồn tại"}), 400
+    else:
+        emp_id = _current_employee_id()
+        
     if not emp_id:
         return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
-    d = request.get_json(silent=True) or {}
+
     try:
         ot_date = datetime.strptime(d["date"], "%Y-%m-%d").date()
         hours = float(d["hours"])
@@ -513,6 +523,50 @@ def create_overtime():
     db.session.commit()
     return jsonify({"message": "Đã gửi đơn tăng ca", "id": o.id}), 201
 
+
+@compensation_bp.route("/overtime/<int:oid>", methods=["PUT"])
+@jwt_required()
+def update_overtime(oid):
+    """HR sửa đơn tăng ca của nhân viên."""
+    block = _guard()
+    if block:
+        return block
+    o = OvertimeRequest.query.filter_by(id=oid, tenant_id=g.tenant_id).first()
+    if not o:
+        return jsonify({"error": "Không tìm thấy"}), 404
+        
+    d = request.get_json(silent=True) or {}
+    
+    if "date" in d:
+        try:
+            o.date = datetime.strptime(d["date"], "%Y-%m-%d").date()
+        except ValueError:
+            return jsonify({"error": "Ngày không hợp lệ"}), 400
+            
+    if "hours" in d:
+        try:
+            h = float(d["hours"])
+            if h <= 0 or h > 12:
+                return jsonify({"error": "Số giờ phải trong khoảng 0-12"}), 400
+            o.hours = h
+        except ValueError:
+            return jsonify({"error": "Số giờ không hợp lệ"}), 400
+            
+    if "ot_type" in d:
+        if d["ot_type"] in ("WEEKDAY", "WEEKEND", "HOLIDAY"):
+            o.ot_type = d["ot_type"]
+            
+    if "reason" in d:
+        o.reason = d["reason"]
+        
+    if "employee_id" in d:
+        emp = Employee.query.filter_by(id=d["employee_id"], tenant_id=g.tenant_id).first()
+        if not emp:
+            return jsonify({"error": "Nhân viên không tồn tại"}), 400
+        o.employee_id = emp.id
+        
+    db.session.commit()
+    return jsonify({"message": "Đã cập nhật đơn tăng ca"}), 200
 
 @compensation_bp.route("/overtime/<int:oid>/approve", methods=["PUT"])
 @jwt_required()

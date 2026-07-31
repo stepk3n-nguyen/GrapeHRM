@@ -163,7 +163,14 @@ def list_users():
     if not is_admin():
         return jsonify({"error": "Không có quyền truy cập"}), 403
 
-    users = User.query.filter_by(tenant_id=g.tenant_id).all()
+    users_query = User.query.filter_by(tenant_id=g.tenant_id)
+    # ẩn thông tin tài khoản superadmin
+    current_role = get_jwt().get("role")
+    if current_role == "admin":
+        users_query = users_query.filter(User.role != "super_admin")
+        
+    users = users_query.all()
+    
     return jsonify([{
         "id": u.id,
         "username": u.username,

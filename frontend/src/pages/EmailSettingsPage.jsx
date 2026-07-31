@@ -5,11 +5,11 @@ import { Save, Send, CheckCircle, Loader2 } from 'lucide-react';
 const EmailSettingsPage = () => {
   const { authFetch, user } = useAuth();
   const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
-  
+
   const [loading, setLoading] = useState(false);
   const [testing, setTesting] = useState(false);
   const [toasts, setToasts] = useState([]);
-  
+
   const [form, setForm] = useState({
     MAIL_SERVER: '',
     MAIL_PORT: '',
@@ -148,18 +148,18 @@ const EmailSettingsPage = () => {
               <form onSubmit={handleSave}>
                 <div className="form-group">
                   <label className="form-label form-label--required">SMTP Server</label>
-                  <input type="text" className="input" placeholder="smtp.gmail.com" value={form.MAIL_SERVER} onChange={e => setForm({...form, MAIL_SERVER: e.target.value})} required />
+                  <input type="text" className="input" placeholder="smtp.gmail.com" value={form.MAIL_SERVER} onChange={e => setForm({ ...form, MAIL_SERVER: e.target.value })} required />
                 </div>
-                
+
                 <div style={{ display: 'flex', gap: '16px' }}>
                   <div className="form-group" style={{ flex: 1 }}>
                     <label className="form-label form-label--required">Port</label>
-                    <input type="number" className="input" placeholder="587" value={form.MAIL_PORT} onChange={e => setForm({...form, MAIL_PORT: e.target.value})} required />
+                    <input type="number" className="input" placeholder="587" value={form.MAIL_PORT} onChange={e => setForm({ ...form, MAIL_PORT: e.target.value })} required />
                   </div>
                   <div className="form-group" style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                     <label className="form-label">Sử dụng TLS</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px' }}>
-                      <input type="checkbox" id="use_tls" checked={form.MAIL_USE_TLS} onChange={e => setForm({...form, MAIL_USE_TLS: e.target.checked})} />
+                      <input type="checkbox" id="use_tls" checked={form.MAIL_USE_TLS} onChange={e => setForm({ ...form, MAIL_USE_TLS: e.target.checked })} />
                       <label htmlFor="use_tls">Có</label>
                     </div>
                   </div>
@@ -167,18 +167,18 @@ const EmailSettingsPage = () => {
 
                 <div className="form-group">
                   <label className="form-label form-label--required">Tên đăng nhập (Email)</label>
-                  <input type="text" className="input" placeholder="your-email@gmail.com" value={form.MAIL_USERNAME} onChange={e => setForm({...form, MAIL_USERNAME: e.target.value})} required />
+                  <input type="text" className="input" placeholder="your-email@gmail.com" value={form.MAIL_USERNAME} onChange={e => setForm({ ...form, MAIL_USERNAME: e.target.value })} required />
                 </div>
 
                 <div className="form-group">
                   <label className="form-label">Mật khẩu (App Password)</label>
-                  <input type="password" className="input" placeholder={isPasswordSet ? "******** (Đã thiết lập)" : "Nhập mật khẩu..."} value={form.MAIL_PASSWORD} onChange={e => setForm({...form, MAIL_PASSWORD: e.target.value})} />
+                  <input type="password" className="input" placeholder={isPasswordSet ? "******** (Đã thiết lập)" : "Nhập mật khẩu..."} value={form.MAIL_PASSWORD} onChange={e => setForm({ ...form, MAIL_PASSWORD: e.target.value })} />
                   {isPasswordSet && <small style={{ color: 'var(--color-text-muted)' }}>Để trống nếu bạn không muốn thay đổi mật khẩu hiện tại.</small>}
                 </div>
 
                 <div className="form-group">
                   <label className="form-label form-label--required">Tên người gửi mặc định</label>
-                  <input type="text" className="input" placeholder="GrapeHRM <noreply@grapehrm.com>" value={form.MAIL_DEFAULT_SENDER} onChange={e => setForm({...form, MAIL_DEFAULT_SENDER: e.target.value})} required />
+                  <input type="text" className="input" placeholder="GrapeHRM <noreply@grapehrm.com>" value={form.MAIL_DEFAULT_SENDER} onChange={e => setForm({ ...form, MAIL_DEFAULT_SENDER: e.target.value })} required />
                 </div>
 
                 <div style={{ marginTop: '24px', textAlign: 'right' }}>
@@ -196,9 +196,9 @@ const EmailSettingsPage = () => {
               <h3 className="card__title">Gửi thư kiểm tra (Test Email)</h3>
             </div>
             <div className="card__body">
-              <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: '16px' }}>
+              {/* <p style={{ color: 'var(--color-text-muted)', fontSize: '13px', marginBottom: '16px' }}>
                 Sau khi lưu cấu hình, bạn có thể gửi một email kiểm tra để xác nhận xem máy chủ SMTP đã hoạt động chính xác hay chưa.
-              </p>
+              </p> */}
               <form onSubmit={handleTestEmail}>
                 <div className="form-group">
                   <label className="form-label form-label--required">Email người nhận</label>

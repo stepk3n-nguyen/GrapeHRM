@@ -361,7 +361,15 @@ def today_stats(tenant_id, today=None):
     not_checked = len(active_ids) - len(checked_ids) if working_today else 0
 
     total_active = len(active_ids)
-    rate = round(present / total_active * 100, 1) if (total_active and working_today) else 0.0
+    
+    # Dù là ngày nghỉ nhưng nếu có người đi làm (present > 0) thì vẫn tính tỷ lệ
+    if total_active > 0:
+        if working_today or present > 0:
+            rate = round(present / total_active * 100, 1)
+        else:
+            rate = 0.0
+    else:
+        rate = 0.0
 
     return {
         "date": today.isoformat(),

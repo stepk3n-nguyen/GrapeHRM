@@ -494,9 +494,9 @@ def create_overtime():
     """Nhân viên đăng ký tăng ca cho CHÍNH MÌNH (server lấy employee từ token)."""
     d = request.get_json(silent=True) or {}
     
+    from app.models.employee import Employee
     if _is_hr_admin() and d.get("employee_id"):
         emp_id = d.get("employee_id")
-        from app.models.employee import Employee
         emp = Employee.query.filter_by(id=emp_id, tenant_id=g.tenant_id).first()
         if not emp:
             return jsonify({"error": "Nhân viên không tồn tại"}), 400
@@ -521,6 +521,24 @@ def create_overtime():
                         hours=hours, ot_type=ot_type, reason=d.get("reason"), status="PENDING")
     db.session.add(o)
     db.session.commit()
+
+    try:
+        from app.services.email_service import send_overtime_request_submitted_email
+        from flask import current_app
+        hrs = User.query.filter_by(tenant_id=g.tenant_id, role="hr_manager", is_active=True).all()
+        emp_obj = Employee.query.get(emp_id)
+        if emp_obj:
+            ot_type_label = _OT_LABEL.get(ot_type, ot_type)
+            app_obj = current_app._get_current_object()
+            for hr in hrs:
+                if hr.email:
+                    send_overtime_request_submitted_email(
+                        app_obj, hr.email, emp_obj.full_name(), ot_type_label,
+                        str(ot_date), hours
+                    )
+    except Exception as e:
+        print("Lỗi gửi email tăng ca:", e)
+
     return jsonify({"message": "Đã gửi đơn tăng ca", "id": o.id}), 201
 
 
@@ -582,6 +600,19 @@ def approve_overtime(oid):
     o.status = "APPROVED"
     log_action("APPROVE", "OVERTIME", o.id)
     db.session.commit()
+
+    try:
+        from app.services.email_service import send_overtime_final_approved_email
+        from flask import current_app
+        if o.employee and o.employee.work_email:
+            ot_type_label = _OT_LABEL.get(o.ot_type, o.ot_type)
+            app_obj = current_app._get_current_object()
+            send_overtime_final_approved_email(
+                app_obj, o.employee.work_email, ot_type_label, str(o.date), float(o.hours)
+            )
+    except Exception as e:
+        print("Lỗi gửi email duyệt tăng ca:", e)
+
     return jsonify({"message": "Đã duyệt tăng ca"}), 200
 
 
@@ -596,7 +627,22 @@ def reject_overtime(oid):
         return jsonify({"error": "Không tìm thấy"}), 404
     o.status = "REJECTED"
     log_action("REJECT", "OVERTIME", o.id)
+    d = request.get_json(silent=True) or {}
+    reason = d.get("reason", "Không có ghi chú")
     db.session.commit()
+
+    try:
+        from app.services.email_service import send_overtime_rejected_email
+        from flask import current_app
+        if o.employee and o.employee.work_email:
+            ot_type_label = _OT_LABEL.get(o.ot_type, o.ot_type)
+            app_obj = current_app._get_current_object()
+            send_overtime_rejected_email(
+                app_obj, o.employee.work_email, ot_type_label, str(o.date), float(o.hours), reason
+            )
+    except Exception as e:
+        print("Lỗi gửi email từ chối tăng ca:", e)
+
     return jsonify({"message": "Đã từ chối tăng ca"}), 200
 
 
@@ -612,4 +658,21 @@ def delete_overtime(oid):
             return jsonify({"error": "Chỉ hủy được đơn đang chờ của chính bạn"}), 403
     db.session.delete(o)
     db.session.commit()
+
+    try:
+        from app.services.email_service import send_overtime_cancelled_email
+        from flask import current_app
+        hrs = User.query.filter_by(tenant_id=g.tenant_id, role="hr_manager", is_active=True).all()
+        if o.employee:
+            ot_type_label = _OT_LABEL.get(o.ot_type, o.ot_type)
+            app_obj = current_app._get_current_object()
+            for hr in hrs:
+                if hr.email:
+                    send_overtime_cancelled_email(
+                        app_obj, hr.email, o.employee.full_name(), ot_type_label,
+                        str(o.date), float(o.hours)
+                    )
+    except Exception as e:
+        print("Lỗi gửi email hủy tăng ca:", e)
+
     return jsonify({"message": "Đã xóa đơn tăng ca"}), 200

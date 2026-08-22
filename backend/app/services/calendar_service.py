@@ -33,7 +33,7 @@ def is_working_day(d, holidays):
 
 
 def count_standard_working_days(tenant_id, year, month):
-    """Số ngày công chuẩn trong tháng = số ngày T2–T6 trừ đi ngày lễ có lương.
+    """Số ngày công chuẩn trong tháng = số ngày T2–T7 trừ đi ngày lễ có lương.
 
     Ý nghĩa: NV đi làm đủ các ngày-công-chuẩn này là nhận đủ lương; ngày lễ
     được trả lương nhưng không nằm trong mẫu số nên không làm giảm tỷ lệ.

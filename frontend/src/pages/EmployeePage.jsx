@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { 
-  Plus, Edit, Trash2, Search, X, Loader2, UserCheck, UserX, 
-  Calendar, Phone, Mail, Award, CheckCircle, AlertTriangle 
+import {
+  Plus, Edit, Trash2, Search, X, Loader2, UserCheck, UserX,
+  Calendar, Phone, Mail, Award, CheckCircle, AlertTriangle
 } from 'lucide-react';
 
 const EmployeePage = () => {
@@ -10,11 +10,11 @@ const EmployeePage = () => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  
+
   // Trạng thái biểu mẫu Modal Nhân viên
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editEmployee, setEditEmployee] = useState(null); // null = Thêm mới, object = Đang sửa
-  
+
   // Trạng thái quản lý Chức vụ (Job Titles)
   const [titles, setTitles] = useState([]);
   const [isTitleModalOpen, setIsTitleModalOpen] = useState(false);
@@ -238,19 +238,38 @@ const EmployeePage = () => {
     }
   };
 
-  const handleDeleteEmployee = async (emp) => {
-    const isConfirmed = window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${emp.full_name}" khỏi hệ thống không?`);
-    if (!isConfirmed) return;
+  const handleDeleteEmployee = async (emp, force = false) => {
+    if (!force) {
+      const isConfirmed = window.confirm(`Bạn có chắc chắn muốn xóa nhân viên "${emp.full_name}" khỏi hệ thống không?`);
+      if (!isConfirmed) return;
+    }
 
     try {
-      const response = await authFetch(`/api/employees/${emp.id}`, {
+      const url = force ? `/api/employees/${emp.id}?force=1` : `/api/employees/${emp.id}`;
+      const response = await authFetch(url, {
         method: 'DELETE',
       });
+      
       if (response.ok) {
         showToast('Xóa nhân viên thành công!', 'success');
         fetchEmployees();
       } else {
-        showToast('Không thể xóa nhân viên.', 'error');
+        let errorMessage = 'Không thể xóa nhân viên.';
+        try {
+          const resData = await response.json();
+          errorMessage = resData.error || errorMessage;
+          
+          if (response.status === 409 && (resData.has_payslip || resData.has_attendance)) {
+            const forceConfirm = window.confirm(`${errorMessage}\n\nBạn có muốn XÓA TOÀN BỘ dữ liệu của nhân viên này không?`);
+            if (forceConfirm) {
+              return handleDeleteEmployee(emp, true);
+            }
+            return;
+          }
+        } catch (e) {
+          // ignore parsing error
+        }
+        showToast(errorMessage, 'error');
       }
     } catch (err) {
       console.error(err);
@@ -401,10 +420,10 @@ const EmployeePage = () => {
         <div className="card__body" style={{ padding: '16px 20px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', width: '100%', maxWidth: '400px', position: 'relative' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', color: 'var(--color-text-muted)' }} />
-            <input 
-              type="text" 
-              className="input" 
-              placeholder="Tìm theo họ tên, mã nhân viên, email..." 
+            <input
+              type="text"
+              className="input"
+              placeholder="Tìm theo họ tên, mã nhân viên, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               style={{ paddingLeft: '38px' }}
@@ -450,11 +469,11 @@ const EmployeePage = () => {
                         {index + 1}
                       </td>
                       <td>
-                        <div style={{ 
-                          width: '36px', 
-                          height: '36px', 
-                          borderRadius: '50%', 
-                          backgroundColor: 'var(--color-primary-light)', 
+                        <div style={{
+                          width: '36px',
+                          height: '36px',
+                          borderRadius: '50%',
+                          backgroundColor: 'var(--color-primary-light)',
                           color: 'var(--color-primary)',
                           fontWeight: '700',
                           fontSize: '14px',
@@ -477,7 +496,7 @@ const EmployeePage = () => {
                         {emp.full_name}
                       </td>
                       <td>
-                        <span className={`badge ${emp.role === 'admin' ? 'badge--danger' : emp.role === 'hr_manager' ? 'badge--warning' : 'badge--primary'}`} style={{textTransform: 'capitalize'}}>
+                        <span className={`badge ${emp.role === 'admin' ? 'badge--danger' : emp.role === 'hr_manager' ? 'badge--warning' : 'badge--primary'}`} style={{ textTransform: 'capitalize' }}>
                           {emp.role ? emp.role.replace('_', ' ') : 'employee'}
                         </span>
                       </td>
@@ -495,15 +514,15 @@ const EmployeePage = () => {
                       </td>
                       <td style={{ textAlign: 'right' }}>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
-                          <button 
-                            className="btn btn--icon" 
+                          <button
+                            className="btn btn--icon"
                             title="Sửa thông tin"
                             onClick={() => handleOpenEditModal(emp)}
                           >
                             <Edit size={16} />
                           </button>
-                          <button 
-                            className="btn btn--icon btn--icon-danger" 
+                          <button
+                            className="btn btn--icon btn--icon-danger"
                             title="Xóa nhân sự"
                             onClick={() => handleDeleteEmployee(emp)}
                           >
@@ -530,10 +549,10 @@ const EmployeePage = () => {
               </h3>
               <button className="modal__close" type="button" onClick={() => setIsModalOpen(false)}>&times;</button>
             </div>
-            
+
             <form onSubmit={handleSaveEmployee}>
               <div className="modal__body" style={{ maxHeight: '75vh', overflowY: 'auto' }}>
-                
+
                 {/* Custom CSS for 3-columns grid */}
                 <style>{`
                   .form-grid-3 {
@@ -553,10 +572,10 @@ const EmployeePage = () => {
                 <div className="form-grid-3">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="employee_id">Mã nhân sự</label>
-                    <input 
-                      type="text" 
-                      id="employee_id" 
-                      className="input" 
+                    <input
+                      type="text"
+                      id="employee_id"
+                      className="input"
                       value={formData.employee_id}
                       disabled
                       style={{ backgroundColor: '#e9ecef', cursor: 'not-allowed' }}
@@ -564,9 +583,9 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="title_id">Chức vụ</label>
-                    <select 
-                      id="title_id" 
-                      className="input" 
+                    <select
+                      id="title_id"
+                      className="input"
                       value={formData.title_id}
                       onChange={(e) => setFormData({ ...formData, title_id: e.target.value })}
                       required
@@ -577,9 +596,9 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="department_id">Phòng ban</label>
-                    <select 
-                      id="department_id" 
-                      className="input" 
+                    <select
+                      id="department_id"
+                      className="input"
                       value={formData.department_id}
                       onChange={(e) => setFormData({ ...formData, department_id: e.target.value })}
                       required
@@ -610,11 +629,11 @@ const EmployeePage = () => {
                 <div className="form-grid-3">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="first_name">Họ & Tên đệm</label>
-                    <input 
-                      type="text" 
-                      id="first_name" 
-                      className="input" 
-                      placeholder="Nguyễn Văn" 
+                    <input
+                      type="text"
+                      id="first_name"
+                      className="input"
+                      placeholder="Nguyễn Văn"
                       value={formData.first_name}
                       onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
                       required
@@ -622,11 +641,11 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="last_name">Tên chính</label>
-                    <input 
-                      type="text" 
-                      id="last_name" 
-                      className="input" 
-                      placeholder="An" 
+                    <input
+                      type="text"
+                      id="last_name"
+                      className="input"
+                      placeholder="An"
                       value={formData.last_name}
                       onChange={(e) => setFormData({ ...formData, last_name: e.target.value })}
                       required
@@ -634,9 +653,9 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="gender">Giới tính</label>
-                    <select 
-                      id="gender" 
-                      className="input" 
+                    <select
+                      id="gender"
+                      className="input"
                       value={formData.gender}
                       onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
                       required
@@ -652,10 +671,10 @@ const EmployeePage = () => {
                 <div className="form-grid-3">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="birthday">Ngày sinh</label>
-                    <input 
-                      type="date" 
-                      id="birthday" 
-                      className="input" 
+                    <input
+                      type="date"
+                      id="birthday"
+                      className="input"
                       value={formData.birthday}
                       onChange={(e) => setFormData({ ...formData, birthday: e.target.value })}
                       required
@@ -663,9 +682,9 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" htmlFor="marital_status">Hôn nhân</label>
-                    <select 
-                      id="marital_status" 
-                      className="input" 
+                    <select
+                      id="marital_status"
+                      className="input"
                       value={formData.marital_status}
                       onChange={(e) => setFormData({ ...formData, marital_status: e.target.value })}
                     >
@@ -687,10 +706,10 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="mobile">Số điện thoại</label>
-                    <input 
-                      type="tel" 
-                      id="mobile" 
-                      className="input" 
+                    <input
+                      type="tel"
+                      id="mobile"
+                      className="input"
                       value={formData.mobile}
                       onChange={(e) => setFormData({ ...formData, mobile: e.target.value })}
                       required
@@ -702,10 +721,10 @@ const EmployeePage = () => {
                 <div className="form-grid-3">
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="work_email">Email công việc</label>
-                    <input 
-                      type="email" 
-                      id="work_email" 
-                      className="input" 
+                    <input
+                      type="email"
+                      id="work_email"
+                      className="input"
                       value={formData.work_email}
                       onChange={(e) => setFormData({ ...formData, work_email: e.target.value })}
                       required
@@ -713,10 +732,10 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label form-label--required" htmlFor="joined_date">Ngày bắt đầu</label>
-                    <input 
-                      type="date" 
-                      id="joined_date" 
-                      className="input" 
+                    <input
+                      type="date"
+                      id="joined_date"
+                      className="input"
                       value={formData.joined_date}
                       onChange={(e) => setFormData({ ...formData, joined_date: e.target.value })}
                       required
@@ -724,10 +743,10 @@ const EmployeePage = () => {
                   </div>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" htmlFor="end_date">Ngày kết thúc</label>
-                    <input 
-                      type="date" 
-                      id="end_date" 
-                      className="input" 
+                    <input
+                      type="date"
+                      id="end_date"
+                      className="input"
                       value={formData.end_date}
                       onChange={(e) => setFormData({ ...formData, end_date: e.target.value })}
                     />
@@ -738,10 +757,10 @@ const EmployeePage = () => {
                 <div style={{ marginBottom: '16px' }}>
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" htmlFor="address">Địa chỉ</label>
-                    <input 
-                      type="text" 
-                      id="address" 
-                      className="input" 
+                    <input
+                      type="text"
+                      id="address"
+                      className="input"
                       value={formData.address}
                       onChange={(e) => setFormData({ ...formData, address: e.target.value })}
                       placeholder="Số nhà, đường, phường/xã, quận/huyện, tỉnh/thành phố"
@@ -754,9 +773,9 @@ const EmployeePage = () => {
                   <div style={{ marginBottom: '16px' }}>
                     <div className="form-group" style={{ marginBottom: 0 }}>
                       <label className="form-label form-label--required" htmlFor="role">Vai trò hệ thống</label>
-                      <select 
-                        id="role" 
-                        className="input" 
+                      <select
+                        id="role"
+                        className="input"
                         value={formData.role}
                         onChange={(e) => setFormData({ ...formData, role: e.target.value })}
                         required
@@ -777,7 +796,7 @@ const EmployeePage = () => {
                   <div className="form-group" style={{ marginBottom: 0 }}>
                     <label className="form-label" htmlFor="profile_pic_file">Ảnh đại diện nhân viên</label>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <div style={{ 
+                      <div style={{
                         width: '42px', height: '42px', borderRadius: '50%', backgroundColor: 'var(--color-primary-light)', color: 'var(--color-primary)', fontWeight: '700', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', border: '2px solid var(--color-border-light)', flexShrink: 0
                       }}>
                         {formData.profile_pic_url ? (
@@ -787,11 +806,11 @@ const EmployeePage = () => {
                         )}
                       </div>
                       <div style={{ flex: 1 }}>
-                        <input 
-                          type="file" 
-                          id="profile_pic_file" 
+                        <input
+                          type="file"
+                          id="profile_pic_file"
                           accept="image/*"
-                          className="input" 
+                          className="input"
                           onChange={(e) => {
                             const file = e.target.files[0];
                             if (file) {
@@ -808,9 +827,9 @@ const EmployeePage = () => {
                         />
                       </div>
                       {formData.profile_pic_url && (
-                        <button 
-                          type="button" 
-                          className="btn btn--secondary" 
+                        <button
+                          type="button"
+                          className="btn btn--secondary"
                           onClick={() => {
                             setFormData({ ...formData, profile_pic_url: '' });
                             const fileInput = document.getElementById('profile_pic_file');

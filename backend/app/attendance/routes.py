@@ -25,6 +25,7 @@ from app.models.employee import Employee
 from app.models.user import User
 from app.services.geo import nearest_location
 from app.services import attendance_service as svc
+from app.services.calendar_service import holiday_dates, is_working_day
 
 
 def check_hr_admin():
@@ -234,13 +235,19 @@ def attendance_today():
     emp = _current_employee()
     if not emp:
         return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
-    att = Attendance.query.filter_by(employee_id=emp.id, date=date.today()).first()
+    today = date.today()
+    att = Attendance.query.filter_by(employee_id=emp.id, date=today).first()
     has_location = WorkLocation.query.filter_by(tenant_id=g.tenant_id, is_active=True).count() > 0
     shift = svc.resolve_shift(emp)
     client_ip = _get_client_ip()
     ip_ok, _ = _check_ip_whitelist(client_ip)
+
+    holidays = holiday_dates(g.tenant_id, today.year, month=today.month)
+    working_today = is_working_day(today, holidays)
+
     return jsonify({
         "has_work_location": has_location,
+        "is_working_day": working_today,
         "shift": {
             "id": shift.id, "name": shift.name,
             "start_time": _fmt_time(shift.start_time), "end_time": _fmt_time(shift.end_time),
@@ -258,6 +265,13 @@ def self_check_in():
     if not emp:
         return jsonify({"error": "Tài khoản chưa gắn hồ sơ nhân viên"}), 400
 
+    today = date.today()
+    holidays = holiday_dates(g.tenant_id, today.year, month=today.month)
+    if not is_working_day(today, holidays):
+        return jsonify({
+            "error": "Hôm nay không phải ngày làm việc (ngày nghỉ/ngày lễ). Bạn không thể chấm công."
+        }), 400
+
     # ── Xác thực bằng IP mạng văn phòng ──
     client_ip = _get_client_ip()
     ip_ok, loc = _check_ip_whitelist(client_ip)
@@ -267,7 +281,6 @@ def self_check_in():
             "client_ip": client_ip,
         }), 403
 
-    today = date.today()
     att = Attendance.query.filter_by(employee_id=emp.id, date=today).first()
     if att and att.check_in:
         return jsonify({"error": "Bạn đã chấm công vào hôm nay rồi"}), 400
@@ -451,7 +464,7 @@ def get_work_locations():
 @work_location_bp.route("", methods=["POST"])
 @jwt_required()
 def create_work_location():
-    if not check_hr_admin():
+    if get_jwt().get("role") not in ["super_admin", "admin"]:
         return jsonify({"error": "Không có quyền"}), 403
     data = request.get_json(silent=True) or {}
     if not data.get("name"):
@@ -470,7 +483,7 @@ def create_work_location():
 @work_location_bp.route("/<int:loc_id>", methods=["PUT"])
 @jwt_required()
 def update_work_location(loc_id):
-    if not check_hr_admin():
+    if get_jwt().get("role") not in ["super_admin", "admin"]:
         return jsonify({"error": "Không có quyền"}), 403
     loc = WorkLocation.query.filter_by(id=loc_id, tenant_id=g.tenant_id).first()
     if not loc:
@@ -486,7 +499,7 @@ def update_work_location(loc_id):
 @work_location_bp.route("/<int:loc_id>", methods=["DELETE"])
 @jwt_required()
 def delete_work_location(loc_id):
-    if not check_hr_admin():
+    if get_jwt().get("role") not in ["super_admin", "admin"]:
         return jsonify({"error": "Không có quyền"}), 403
     loc = WorkLocation.query.filter_by(id=loc_id, tenant_id=g.tenant_id).first()
     if not loc:

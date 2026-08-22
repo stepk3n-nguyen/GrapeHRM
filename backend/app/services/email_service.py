@@ -163,3 +163,34 @@ def send_leave_cancelled_email(app, hr_email, employee_name, leave_type_name, st
     subject = "[GrapeHRM] Đơn nghỉ phép đã bị hủy ⚠️"
     body = leave_cancelled_html(employee_name, leave_type_name, start_date, end_date)
     send_email(app, hr_email, subject, body, is_html=True)
+
+
+# ── Templates mẫu cho module Overtime ────────────────────────────────────
+from app.services.email_templates import (
+    overtime_submitted_html, overtime_approved_html,
+    overtime_rejected_html, overtime_cancelled_html
+)
+
+def send_overtime_request_submitted_email(app, hr_email, employee_name, ot_type_label, date, hours):
+    """Email gửi cho HR khi nhân viên đăng ký tăng ca."""
+    subject = "[GrapeHRM] Đơn đăng ký tăng ca mới cần phê duyệt"
+    body = overtime_submitted_html(employee_name, ot_type_label, date, hours)
+    send_email(app, hr_email, subject, body, is_html=True)
+
+def send_overtime_final_approved_email(app, employee_email, ot_type_label, date, hours):
+    """Email gửi cho Nhân viên khi đơn tăng ca được duyệt."""
+    subject = "[GrapeHRM] Đơn đăng ký tăng ca được duyệt ✅"
+    body = overtime_approved_html(ot_type_label, date, hours)
+    send_email(app, employee_email, subject, body, is_html=True)
+
+def send_overtime_rejected_email(app, employee_email, ot_type_label, date, hours, reason=None):
+    """Email gửi cho Nhân viên khi đơn tăng ca bị từ chối."""
+    subject = "[GrapeHRM] Đơn đăng ký tăng ca bị từ chối ❌"
+    body = overtime_rejected_html(ot_type_label, date, hours, reason)
+    send_email(app, employee_email, subject, body, is_html=True)
+
+def send_overtime_cancelled_email(app, hr_email, employee_name, ot_type_label, date, hours):
+    """Email gửi cho HR khi nhân viên tự hủy đơn tăng ca."""
+    subject = "[GrapeHRM] Đơn đăng ký tăng ca đã bị hủy ⚠️"
+    body = overtime_cancelled_html(employee_name, ot_type_label, date, hours)
+    send_email(app, hr_email, subject, body, is_html=True)

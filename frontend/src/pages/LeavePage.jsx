@@ -308,7 +308,7 @@ const LeavePage = () => {
             <div className="card__body" style={{ padding: 0 }}>
               {loading ? (
                 <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 className="animate-spin" /></div>
-              ) : myRequests.length === 0 ? (
+              ) : myRequests.filter(req => req.status !== 'CANCELLED').length === 0 ? (
                 <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>Bạn chưa có đơn nghỉ phép nào.</div>
               ) : (
                 <div className="table-responsive">
@@ -325,7 +325,7 @@ const LeavePage = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {myRequests.map(req => (
+                      {myRequests.filter(req => req.status !== 'CANCELLED').map(req => (
                         <tr key={req.id}>
                           <td style={{ fontWeight: 600 }}>{req.leave_type}</td>
                           <td>{new Date(req.start_date).toLocaleDateString('vi-VN')}</td>
@@ -453,6 +453,9 @@ const LeavePage = () => {
                     <label className="form-label form-label--required">Đến ngày</label>
                     <input type="date" className="input" value={formData.end_date} onChange={e => setFormData({ ...formData, end_date: e.target.value })} min={formData.start_date || getLocalDateStr()} required />
                   </div>
+                  <p style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: '-8px', gridColumn: 'span 2' }}>
+                    * Ngày bắt đầu và kết thúc nghỉ phải là ngày làm việc (loại trừ T7, CN và Ngày Lễ).
+                  </p>
                 </div>
                 <div className="form-group">
                   <label className="form-label form-label--required">Tổng số ngày nghỉ</label>

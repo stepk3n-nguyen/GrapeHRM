@@ -115,10 +115,10 @@ const PayrollPage = () => {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16, marginBottom: 20 }}>
         <h2 style={{ fontSize: 24, fontWeight: 600, color: 'var(--color-primary-dark)' }}>Bảng lương</h2>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-          <select className="input" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: 100 }}>
+          <select className="input" value={month} onChange={(e) => setMonth(e.target.value)} style={{ width: 135 }}>
             {[...Array(12).keys()].map((i) => <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>)}
           </select>
-          <select className="input" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: 110 }}>
+          <select className="input" value={year} onChange={(e) => setYear(e.target.value)} style={{ width: 130 }}>
             {[...Array(5).keys()].map((i) => { const y = new Date().getFullYear() - 2 + i; return <option key={y} value={y}>Năm {y}</option>; })}
           </select>
           <button className="btn btn--primary" onClick={runPayroll} disabled={running}>

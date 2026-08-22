@@ -11,8 +11,9 @@ const currentYear = new Date().getFullYear();
 const emptyHoliday = { name: '', date: '', is_paid: true, is_recurring: false };
 
 const WorkConfigPage = () => {
-  const { authFetch } = useAuth();
-  const [tab, setTab] = useState('locations');
+  const { authFetch, user } = useAuth();
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin';
+  const [tab, setTab] = useState(isAdmin ? 'locations' : 'shifts');
 
   const [toasts, setToasts] = useState([]);
   const showToast = (message, type = 'success') => {
@@ -161,9 +162,11 @@ const WorkConfigPage = () => {
       </div>
 
       <div className="leave-tabs">
-        <button className={`leave-tabs__tab ${tab === 'locations' ? 'leave-tabs__tab--active' : ''}`} onClick={() => setTab('locations')}>
-          <MapPin size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Địa điểm làm việc
-        </button>
+        {isAdmin && (
+          <button className={`leave-tabs__tab ${tab === 'locations' ? 'leave-tabs__tab--active' : ''}`} onClick={() => setTab('locations')}>
+            <MapPin size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Địa điểm làm việc
+          </button>
+        )}
         <button className={`leave-tabs__tab ${tab === 'shifts' ? 'leave-tabs__tab--active' : ''}`} onClick={() => setTab('shifts')}>
           <Clock size={16} style={{ marginRight: '6px', verticalAlign: 'middle' }} /> Ca làm việc
         </button>
@@ -178,25 +181,29 @@ const WorkConfigPage = () => {
         <div className="card card--no-hover">
           <div className="card__header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h3 className="card__title"><MapPin size={18} /><span>Địa điểm ({locations.length})</span></h3>
-            <button className="btn btn--primary" onClick={() => setLocModal({ form: { ...emptyLoc } })}><Plus size={16} /> Thêm địa điểm</button>
+            {isAdmin && (
+              <button className="btn btn--primary" onClick={() => setLocModal({ form: { ...emptyLoc } })}><Plus size={16} /> Thêm địa điểm</button>
+            )}
           </div>
           <div className="card__body" style={{ padding: 0 }}>
             <div className="table-responsive">
               <table className="table table--zebra">
-                <thead><tr><th>Tên</th><th>IP cho phép</th><th>Trạng thái</th><th style={{ textAlign: 'right' }}>Thao tác</th></tr></thead>
+                <thead><tr><th>Tên</th><th>IP cho phép</th><th>Trạng thái</th>{isAdmin && <th style={{ textAlign: 'right' }}>Thao tác</th>}</tr></thead>
                 <tbody>
                   {locations.map((l) => (
                     <tr key={l.id}>
                       <td style={{ fontWeight: 600 }}>{l.name}</td>
                       <td><code style={{ fontSize: '12px' }}>{l.allowed_ips || '—'}</code></td>
                       <td>{l.is_active ? <span className="status-badge status-badge--approved">Bật</span> : <span className="status-badge status-badge--rejected">Tắt</span>}</td>
-                      <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                        <button className="btn btn--secondary" style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }} onClick={() => setLocModal({ id: l.id, form: { ...l } })}><Pencil size={13} /></button>
-                        <button className="btn btn--danger" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => deleteLocation(l)}><Trash2 size={13} /></button>
-                      </td>
+                      {isAdmin && (
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          <button className="btn btn--secondary" style={{ padding: '4px 10px', fontSize: '12px', marginRight: '6px' }} onClick={() => setLocModal({ id: l.id, form: { ...l } })}><Pencil size={13} /></button>
+                          <button className="btn btn--danger" style={{ padding: '4px 10px', fontSize: '12px' }} onClick={() => deleteLocation(l)}><Trash2 size={13} /></button>
+                        </td>
+                      )}
                     </tr>
                   ))}
-                  {locations.length === 0 && <tr><td colSpan={4} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>Chưa có địa điểm nào. Nhân viên sẽ không chấm công được cho tới khi bạn thêm ít nhất 1 địa điểm.</td></tr>}
+                  {locations.length === 0 && <tr><td colSpan={isAdmin ? 4 : 3} style={{ textAlign: 'center', padding: '32px', color: 'var(--color-text-muted)' }}>Chưa có địa điểm nào. Nhân viên sẽ không chấm công được cho tới khi bạn thêm ít nhất 1 địa điểm.</td></tr>}
                 </tbody>
               </table>
             </div>

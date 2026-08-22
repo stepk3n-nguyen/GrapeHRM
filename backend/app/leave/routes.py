@@ -40,13 +40,16 @@ def _current_employee():
 
 def _count_working_days(start, end, half_day=False):
     """Đếm số ngày làm việc từ start..end (loại T7/CN VÀ ngày lễ có lương).
-    Trả về số ngày (float). half_day=True và cùng 1 ngày → 0.5."""
+    Trả về số ngày (float). half_day=True và cùng 1 ngày làm việc → 0.5."""
     if end < start:
         return 0.0
-    from app.services.calendar_service import working_days_between
+    from app.services.calendar_service import working_days_between, holiday_dates, is_working_day
     days = working_days_between(g.tenant_id, start, end)
     if half_day and start == end:
-        return 0.5
+        hol = holiday_dates(g.tenant_id, start.year, month=start.month)
+        if is_working_day(start, hol):
+            return 0.5
+        return 0.0
     return float(days)
 
 
@@ -325,6 +328,16 @@ def create_request():
     if start_d < date.today():
         return jsonify({"error": "Ngày bắt đầu nghỉ phải từ hôm nay trở đi"}), 400
 
+    # Chặn chọn ngày bắt đầu hoặc kết thúc là ngày nghỉ / ngày lễ (ví dụ Chủ Nhật, Thứ 7)
+    from app.services.calendar_service import holiday_dates, is_working_day
+    hol_start = holiday_dates(g.tenant_id, start_d.year, month=start_d.month)
+    if not is_working_day(start_d, hol_start):
+        return jsonify({"error": "Ngày bắt đầu nghỉ phải là ngày làm việc (không thể chọn Chủ nhật/ngày nghỉ/lễ)"}), 400
+
+    hol_end = holiday_dates(g.tenant_id, end_d.year, month=end_d.month)
+    if not is_working_day(end_d, hol_end):
+        return jsonify({"error": "Ngày kết thúc nghỉ phải là ngày làm việc (không thể chọn Chủ nhật/ngày nghỉ/lễ)"}), 400
+
     # 4) Server TỰ TÍNH số ngày nghỉ (loại T7/CN) — không tin total_days từ client
     half_day = bool(data.get("half_day"))
     total_days = _count_working_days(start_d, end_d, half_day)
@@ -341,15 +354,25 @@ def create_request():
     if overlap:
         return jsonify({"error": "Khoảng ngày này trùng với một đơn nghỉ phép khác"}), 400
 
-    # 6) Enforce số dư phép (chỉ với loại phép có hạn mức trong chính sách)
+    # 6) Enforce số dư phép
     year = start_d.year
     assign = EmployeeLeavePolicy.query.filter_by(employee_id=emp_id, effective_year=year).first()
     policy = assign.policy if assign else LeavePolicy.query.filter_by(tenant_id=g.tenant_id, is_default=True).first()
-    entitlement = 0
-    if policy:
-        detail = next((d for d in policy.details if d.leave_type_id == leave_type.id), None)
-        entitlement = detail.entitlement if detail else 0
-    if entitlement and entitlement > 0:
+    
+    limit = None
+    if not leave_type.is_paid:
+        limit = None
+    else:
+        if policy:
+            detail = next((d for d in policy.details if d.leave_type_id == leave_type.id), None)
+            if detail:
+                limit = detail.entitlement
+                
+        # Nếu không có trong chính sách nhưng loại phép có max_days > 0 thì dùng max_days
+        if limit is None and leave_type.max_days > 0:
+            limit = leave_type.max_days
+
+    if limit is not None:
         existing = LeaveRequest.query.filter(
             LeaveRequest.employee_id == emp_id,
             LeaveRequest.leave_type_id == leave_type.id,
@@ -357,8 +380,11 @@ def create_request():
             LeaveRequest.status.in_(["APPROVED", "PENDING_HR"]),
         ).all()
         consumed = sum(float(r.total_days) for r in existing)
-        remaining = entitlement - consumed
+        remaining = limit - consumed
+        
         if total_days > remaining:
+            if remaining <= 0:
+                return jsonify({"error": f"Vượt quỹ phép: bạn đã hết phép cho loại nghỉ này, đang xin thêm {total_days:g} ngày"}), 400
             return jsonify({"error": f"Vượt quỹ phép: chỉ còn {remaining:g} ngày, bạn đang xin {total_days:g} ngày"}), 400
 
     initial_status = "PENDING_HR"

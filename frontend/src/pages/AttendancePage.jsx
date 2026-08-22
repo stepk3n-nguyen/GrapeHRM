@@ -34,6 +34,7 @@ const AttendancePage = () => {
   const [today, setToday] = useState(null);
   const [hasLocation, setHasLocation] = useState(true);
   const [ipMatch, setIpMatch] = useState(false);
+  const [isWorkingDay, setIsWorkingDay] = useState(true);
   const [clientIp, setClientIp] = useState('');
   const [punching, setPunching] = useState(false);
 
@@ -85,6 +86,7 @@ const AttendancePage = () => {
         setToday(data.attendance);
         setHasLocation(data.has_work_location);
         setIpMatch(data.ip_match);
+        setIsWorkingDay(data.is_working_day !== false);
         setClientIp(data.client_ip || '');
       }
     } catch (err) { console.error(err); }
@@ -224,13 +226,19 @@ const AttendancePage = () => {
                 <span>Công ty chưa cấu hình địa điểm làm việc — chưa thể chấm công. Liên hệ quản trị viên.</span>
               </div>
             )}
-            {hasLocation && !ipMatch && (
+            {hasLocation && !isWorkingDay && (
+              <div className="alert alert--warning" style={{ marginBottom: '12px' }}>
+                <AlertTriangle size={16} />
+                <span>Hôm nay không phải ngày làm việc của bạn (nghỉ phép / ngày lễ / cuối tuần). Bạn không thể chấm công.</span>
+              </div>
+            )}
+            {hasLocation && isWorkingDay && !ipMatch && (
               <div className="alert alert--error" style={{ marginBottom: '12px' }}>
                 <Wifi size={16} />
                 <span>IP của bạn (<b>{clientIp}</b>) không nằm trong mạng văn phòng. Hãy kết nối Wi-Fi/mạng LAN công ty để chấm công.</span>
               </div>
             )}
-            {hasLocation && ipMatch && (
+            {hasLocation && isWorkingDay && ipMatch && (
               <div className="alert alert--success" style={{ marginBottom: '12px' }}>
                 <ShieldCheck size={16} />
                 <span>IP của bạn (<b>{clientIp}</b>) đã được xác thực — mạng văn phòng hợp lệ.</span>
@@ -264,14 +272,14 @@ const AttendancePage = () => {
                 <button
                   className="btn btn--primary"
                   onClick={() => punch('check-in')}
-                  disabled={punching || !hasLocation || !!today?.check_in}
+                  disabled={punching || !hasLocation || !isWorkingDay || !!today?.check_in}
                 >
                   {punching ? <Loader2 size={16} className="animate-spin" /> : <LogIn size={16} />} Chấm vào
                 </button>
                 <button
                   className="btn btn--secondary"
                   onClick={() => punch('check-out')}
-                  disabled={punching || !hasLocation || !today?.check_in || !!today?.check_out}
+                  disabled={punching || !hasLocation || !isWorkingDay || !today?.check_in || !!today?.check_out}
                 >
                   {punching ? <Loader2 size={16} className="animate-spin" /> : <LogOut size={16} />} Chấm ra
                 </button>
@@ -302,10 +310,10 @@ const AttendancePage = () => {
               <Table2 size={15} /> Tổng công tháng
             </button>
           </div>
-          <select className="input" value={month} onChange={e => setMonth(e.target.value)} style={{ width: '100px' }}>
+          <select className="input" value={month} onChange={e => setMonth(e.target.value)} style={{ width: '120px' }}>
             {[...Array(12).keys()].map(i => <option key={i + 1} value={i + 1}>Tháng {i + 1}</option>)}
           </select>
-          <select className="input" value={year} onChange={e => setYear(e.target.value)} style={{ width: '110px' }}>
+          <select className="input" value={year} onChange={e => setYear(e.target.value)} style={{ width: '120px' }}>
             {[...Array(5).keys()].map(i => { const y = new Date().getFullYear() - 2 + i; return <option key={y} value={y}>Năm {y}</option>; })}
           </select>
           {isAdminOrHR && (
@@ -374,53 +382,53 @@ const AttendancePage = () => {
       )}
 
       {view === 'log' && (
-      <div className="card card--no-hover">
-        <div className="card__body" style={{ padding: 0 }}>
-          {loading ? (
-            <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 className="animate-spin" /></div>
-          ) : attendance.length === 0 ? (
-            <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
-              Không có dữ liệu chấm công cho tháng {month}/{year}.
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table--zebra attendance-table">
-                <thead>
-                  <tr>
-                    {isAdminOrHR && <th>Nhân viên</th>}
-                    <th>Ngày</th><th>Vào</th><th>Ra</th><th>Giờ làm</th><th>Trạng thái</th><th>Nguồn</th><th>Ghi chú</th>
-                    {isAdminOrHR && <th style={{ textAlign: 'right' }}>Thao tác</th>}
-                  </tr>
-                </thead>
-                <tbody>
-                  {attendance.map(r => (
-                    <tr key={r.id}>
-                      {isAdminOrHR && <td style={{ fontWeight: 600 }}>{r.employee_name}</td>}
-                      <td>{new Date(r.date).toLocaleDateString('vi-VN')}</td>
-                      <td style={{ color: 'var(--color-success)' }}>{r.check_in || '---'}</td>
-                      <td style={{ color: 'var(--color-error)' }}>{r.check_out || '---'}</td>
-                      <td style={{ fontWeight: 600 }}>{r.work_hours}h</td>
-                      <td>{renderStatus(r.status)}</td>
-                      <td>
-                        {r.source === 'SELF'
-                          ? <span className="badge badge--info">Tự chấm</span>
-                          : <span className="badge badge--warning">Nhập tay</span>}
-                      </td>
-                      <td style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>{r.note}</td>
-                      {isAdminOrHR && (
-                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
-                          <button className="btn btn--secondary" style={{ padding: '4px 9px', fontSize: '12px', marginRight: '6px' }} onClick={() => openEdit(r)}><Pencil size={13} /></button>
-                          <button className="btn btn--danger" style={{ padding: '4px 9px', fontSize: '12px' }} onClick={() => handleDelete(r)}><Trash2 size={13} /></button>
-                        </td>
-                      )}
+        <div className="card card--no-hover">
+          <div className="card__body" style={{ padding: 0 }}>
+            {loading ? (
+              <div style={{ padding: '40px', textAlign: 'center' }}><Loader2 className="animate-spin" /></div>
+            ) : attendance.length === 0 ? (
+              <div style={{ padding: '40px', textAlign: 'center', color: 'var(--color-text-muted)' }}>
+                Không có dữ liệu chấm công cho tháng {month}/{year}.
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table--zebra attendance-table">
+                  <thead>
+                    <tr>
+                      {isAdminOrHR && <th>Nhân viên</th>}
+                      <th>Ngày</th><th>Vào</th><th>Ra</th><th>Giờ làm</th><th>Trạng thái</th><th>Nguồn</th><th>Ghi chú</th>
+                      {isAdminOrHR && <th style={{ textAlign: 'right' }}>Thao tác</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </thead>
+                  <tbody>
+                    {attendance.map(r => (
+                      <tr key={r.id}>
+                        {isAdminOrHR && <td style={{ fontWeight: 600 }}>{r.employee_name}</td>}
+                        <td>{new Date(r.date).toLocaleDateString('vi-VN')}</td>
+                        <td style={{ color: 'var(--color-success)' }}>{r.check_in || '---'}</td>
+                        <td style={{ color: 'var(--color-error)' }}>{r.check_out || '---'}</td>
+                        <td style={{ fontWeight: 600 }}>{r.work_hours}h</td>
+                        <td>{renderStatus(r.status)}</td>
+                        <td>
+                          {r.source === 'SELF'
+                            ? <span className="badge badge--info">Tự chấm</span>
+                            : <span className="badge badge--warning">Nhập tay</span>}
+                        </td>
+                        <td style={{ color: 'var(--color-text-muted)', fontSize: '13px' }}>{r.note}</td>
+                        {isAdminOrHR && (
+                          <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                            <button className="btn btn--secondary" style={{ padding: '4px 9px', fontSize: '12px', marginRight: '6px' }} onClick={() => openEdit(r)}><Pencil size={13} /></button>
+                            <button className="btn btn--danger" style={{ padding: '4px 9px', fontSize: '12px' }} onClick={() => handleDelete(r)}><Trash2 size={13} /></button>
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
         </div>
-      </div>
       )}
 
       {isModalOpen && (

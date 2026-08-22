@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, User, Users, CalendarDays, Clock, Clock4, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2 } from 'lucide-react';
+import { LayoutDashboard, User, Users, CalendarDays, Clock, AlarmClockPlus, ClipboardList, Settings, Mail, MapPin, BarChart3, Wallet, Receipt, Building2 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const Sidebar = ({ isOpen, onCloseSidebar }) => {
@@ -18,7 +18,7 @@ const Sidebar = ({ isOpen, onCloseSidebar }) => {
     ...(isAdminOrHR && user?.tenant_id ? [{ name: 'Chính sách phép', path: '/leave-policy', icon: ClipboardList }] : []),
     ...(user?.tenant_id ? [{ name: 'Chấm công', path: '/attendance', icon: Clock }] : []),
     ...(isAdminOrHR && user?.tenant_id ? [{ name: 'Cấu hình chấm công', path: '/work-config', icon: MapPin }] : []),
-    ...(user?.tenant_id ? [{ name: 'Tăng ca', path: '/overtime', icon: Clock4 }] : []),
+    ...(user?.tenant_id ? [{ name: 'Tăng ca', path: '/overtime', icon: AlarmClockPlus }] : []),
     ...(isAdminOrHR && user?.tenant_id ? [{ name: 'Báo cáo', path: '/reports', icon: BarChart3 }] : []),
     ...(isAdminOrHR && user?.tenant_id ? [{ name: 'Bảng lương', path: '/payroll', icon: Receipt }] : []),
     ...(isAdminOrHR && user?.tenant_id ? [{ name: 'Cấu hình lương', path: '/salary-config', icon: Wallet }] : []),

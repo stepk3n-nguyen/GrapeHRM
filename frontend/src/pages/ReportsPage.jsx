@@ -76,11 +76,11 @@ const ReportsPage = () => {
         <h2 style={{ fontSize: '24px', fontWeight: 600, color: 'var(--color-primary-dark)' }}>Báo cáo & Phân tích</h2>
         <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
           {tab === 'attendance' && (
-            <select className="input" value={month} onChange={e => setMonth(e.target.value)} style={{ width: '100px' }}>
+            <select className="input" value={month} onChange={e => setMonth(e.target.value)} style={{ width: '135px' }}>
               {MONTHS.map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
             </select>
           )}
-          <select className="input" value={year} onChange={e => setYear(e.target.value)} style={{ width: '110px' }}>
+          <select className="input" value={year} onChange={e => setYear(e.target.value)} style={{ width: '130px' }}>
             {[...Array(5).keys()].map(i => { const y = new Date().getFullYear() - 2 + i; return <option key={y} value={y}>Năm {y}</option>; })}
           </select>
         </div>
